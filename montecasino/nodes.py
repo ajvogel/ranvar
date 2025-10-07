@@ -437,6 +437,9 @@ class DigestVariable(RandomVariable):
             int: The largest value in the digest
         """
         return self._digest.upper()
+
+    def mean(self):
+        return self._digest.mean()
     
     def _compile(self, codes, operands):
         """Compile the digest into VM bytecode for random sampling.
