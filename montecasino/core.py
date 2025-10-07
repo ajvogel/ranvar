@@ -366,6 +366,20 @@ class Digest():
         """
         self._add(point, count)
 
+    def mean(self):
+        SxW: pyx.float = 0
+        W: pyx.float = 0
+        i: pyx.int
+
+        m = self.cnts
+        c = self.bins        
+
+        for i in range(self.self.nActive):
+            SxW += m[i]*c[i]
+            W   += m[i]
+
+        return SxW/W
+
     def quantile(self, p):
         """Compute the quantile for a given probability.
         
