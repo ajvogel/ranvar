@@ -1,6 +1,6 @@
 [project]
 name = "montecasino"
-version = "0.7.8rc1"
+version = "0.7.8rc2"
 # dynamic = ["version"]
 description = "MonteCasino enables fast probabilistic modelling"
 authors = [{ name = "Adolph Vogel", email = "ajvogel@gmail.com" }]
