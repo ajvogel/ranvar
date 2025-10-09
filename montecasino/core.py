@@ -366,17 +366,19 @@ class Digest():
         """
         self._add(point, count)
 
+    @pyx.ccall
+    @pyx.boundscheck(False)
+    @pyx.wraparound(False)
+    @pyx.cdivision(True)
+    @pyx.initializedcheck(False)    
     def mean(self):
         SxW: pyx.float = 0
         W: pyx.float = 0
-        i: pyx.int
+        i: pyx.int        
 
-        m = self.cnts
-        c = self.bins        
-
-        for i in range(self.self.nActive):
-            SxW += m[i]*c[i]
-            W   += m[i]
+        for i in range(self.nActive):
+            SxW += self._cnts[i]*self._bins[i]
+            W   += self._cnts[i]
 
         return SxW/W
 
