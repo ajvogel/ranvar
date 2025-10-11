@@ -252,6 +252,9 @@ class RandomVariable():
             LessThanEqual: New less-than-or-equal comparison node with reversed operands
         """
         return LessThanEqual(other, self)
+
+    def mean(self):
+        return self.compute().mean()
         
     def printTree(self, level=0):
         """Print a visual representation of the expression tree.
