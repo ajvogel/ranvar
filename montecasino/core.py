@@ -429,8 +429,12 @@ class Digest():
             else:
                 return self.upper()
                     
-
-    def cdf(self, k):
+    @pyx.ccall
+    @pyx.boundscheck(False)
+    @pyx.wraparound(False)
+    @pyx.cdivision(True)
+    @pyx.initializedcheck(False)    
+    def cdf(self, k:pyx.double) -> pyx.double:
         """Compute the cumulative distribution function at a given point.
         
         Implements the CDF estimation algorithm from Ted Dunning's paper
@@ -444,9 +448,12 @@ class Digest():
         Returns:
             float: Estimated CDF value between 0 and 1.
         """
-        som = 0
-        c = self.bins
-        m = self.cnts
+        som:pyx.double = 0
+        i:pyx.int
+
+        c = self._bins
+        m = self._cnts
+        
 
         if k <= self.lower():
             return 0.
@@ -1264,6 +1271,7 @@ class VirtualMachine():
 
         return self.popStack()
 
+    @pyx.linetrace(True)
     def compute(self, samples:pyx.int=10000, maxBins:pyx.int=32):
         """Run the simulation multiple times and collect results in a t-digest.
         

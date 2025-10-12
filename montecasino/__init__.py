@@ -35,7 +35,13 @@ def P(rv):
         # print(rv_._digests.getBins())
         # print(rv_._digests.getWeights())        
         return 1 - rv_.cdf(0.5)
-    
+
+
+def E(rv):
+    """
+    Returns the expected value of the random variable.
+    """
+    return rv.mean()
 
     
 
