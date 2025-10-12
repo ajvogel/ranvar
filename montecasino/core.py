@@ -731,8 +731,11 @@ class VirtualMachine():
         self._pointers = self.pointers
         self._iterators = self.iterators
 
-    @pyx.ccall
     def reset(self):
+        return self._reset()
+
+    @pyx.cfunc
+    def _reset(self) -> pyx.void:
         """Reset the virtual machine state for a new execution.
         
         Clears all stacks, resets counters, and reinitializes memory arrays.
@@ -743,10 +746,21 @@ class VirtualMachine():
         self.pointerCount = 0
         self.counter      = 0
 
-        self.stack    = np.zeros(100)
-        self.variables = np.zeros(26)
-        self.pointers = np.zeros(16, dtype=np.int_)
-        self.iterators = np.zeros(16)
+        # self.stack    = np.zeros(100)
+        # self.variables = np.zeros(26)
+        # self.pointers = np.zeros(16, dtype=np.int_)
+        # self.iterators = np.zeros(16)
+
+        i: pyx.int
+        for i in range(100):
+            self._stack[i] = 0
+
+        for i in range(26):
+            self._variables[i] = 0
+
+        for i in range(16):
+            self._pointers[i]  = 0
+            self._iterators[i] = 0
 
 
 
