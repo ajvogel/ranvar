@@ -31,6 +31,10 @@ c_srand(c_time(pyx.NULL))
 
 #======================================[ Random Variable ]=========================================
 
+# @pyx.initializedcheck(False)
+# @pyx.boundscheck(False)
+# @pyx.wraparound(False)
+
 
 def _reconstructDigest(maxBins, nActive, centroids, weights):
     digest = Digest(maxBins)
@@ -564,6 +568,7 @@ class Digest():
 
 # Rand
 @pyx.cfunc
+@pyx.cdivision(True)
 def _rand() -> pyx.double:
     out:pyx.double = pyx.cast(pyx.double, c_rand()) / pyx.cast(pyx.double, c_RAND_MAX)
     return out
@@ -735,6 +740,10 @@ class VirtualMachine():
         return self._reset()
 
     @pyx.cfunc
+    @pyx.initializedcheck(False)
+    @pyx.boundscheck(False)
+    @pyx.wraparound(False)
+    @pyx.cdivision(True)
     def _reset(self) -> pyx.void:
         """Reset the virtual machine state for a new execution.
         
@@ -854,7 +863,7 @@ class VirtualMachine():
         """
         return self._pointers[self.pointerCount - 1]
 
-    @pyx.ccall
+    @pyx.cfunc
     @pyx.initializedcheck(False)
     @pyx.boundscheck(False)
     @pyx.wraparound(False)
@@ -867,7 +876,7 @@ class VirtualMachine():
         self._stack[self.stackCount] = value
         self.stackCount += 1
 
-    @pyx.ccall
+    @pyx.cfunc
     @pyx.initializedcheck(False)
     @pyx.boundscheck(False)
     @pyx.wraparound(False)
@@ -880,7 +889,7 @@ class VirtualMachine():
         Raises:
             AssertionError: If the execution stack is empty
         """
-        assert self.stackCount > 0
+        # assert self.stackCount > 0
         self.stackCount -= 1
         return self._stack[self.stackCount]
 
@@ -1127,6 +1136,11 @@ class VirtualMachine():
 
 
     @pyx.cfunc
+    @pyx.initializedcheck(False)
+    @pyx.boundscheck(False)
+    @pyx.wraparound(False)
+    @pyx.cdivision(True)
+    @pyx.linetrace(True)
     def _randHist(self, nBins: pyx.double) -> pyx.void:
         """Sample from a histogram representation.
         
@@ -1304,7 +1318,7 @@ class VirtualMachine():
         i: pyx.int
         for i in range(samples):
             x:pyx.float = self.sample()
-            self.reset()
+            self._reset()
             rv._add(x, 1)
 
         return rv
