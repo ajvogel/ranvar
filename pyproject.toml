@@ -1,8 +1,8 @@
 [project]
-name = "montecasino"
+name = "ranvar"
 version = "0.8.0rc2"
 # dynamic = ["version"]
-description = "MonteCasino enables fast probabilistic modelling"
+description = "RanVar enables fast probabilistic modelling"
 authors = [{ name = "Adolph Vogel", email = "ajvogel@gmail.com" }]
 readme = "README.md"
 license = "MIT"
@@ -12,10 +12,10 @@ dependencies = [
 ]
 
 [tool.hatch.build.targets.sdist]
-include = ["montecasino/*.so"]
+include = ["ravar/*.so"]
 
 [tool.hatch.build.targets.wheel]
-include = ["montecasino/*.so"]
+include = ["ranvar/*.so"]
 
 [dependency-groups]
 dev = [

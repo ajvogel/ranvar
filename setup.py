@@ -35,8 +35,8 @@ from setuptools import setup
 from Cython.Build import cythonize
 
 setup(
-    name="montecasino",
-    ext_modules=cythonize("montecasino/core.py",
+    name="ranvar",
+    ext_modules=cythonize("ranvar/core.py",
                           include_path=["montecasino/"],
                           force=True,
                           annotate=True),
