@@ -31,13 +31,15 @@
 # setup(**setup_kwargs)
 
 
-from setuptools import setup
 from Cython.Build import cythonize
+from setuptools import setup
 
 setup(
     name="ranvar",
-    ext_modules=cythonize("ranvar/core.py",
-                          include_path=["montecasino/"],
-                          force=True,
-                          annotate=True),
+    ext_modules=cythonize(
+        ["ranvar/vm.py", "ranvar/digest.py"],
+        include_path=["ranvar/"],
+        force=True,
+        annotate=True,
+    ),
 )
