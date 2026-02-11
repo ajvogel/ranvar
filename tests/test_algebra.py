@@ -1,4 +1,4 @@
-import montecasino as mc
+import ranvar as mc
 
 
 def test_pow():
