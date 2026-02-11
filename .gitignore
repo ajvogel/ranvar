@@ -11,11 +11,15 @@ pyrightconfig.json
 /casino.sublime-project
 /casino.sublime-workspace
 /casino/*.html
+/ranvar/*.html
 
 casino/random.c
 casino/core.c
 casino.egg-info/*
 casino/*.c
+ranvar/*.c
+ranvar.egg-info/*
+output.csv
 docs/old/*
 docs/ranlib/*
 #build.py#
