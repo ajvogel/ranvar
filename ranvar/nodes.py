@@ -1,6 +1,7 @@
 from typing import SupportsAbs
 import numpy as np
-from .core import *
+from .digest import Digest
+from .vm import VirtualMachine
 from .opcodes import *
 
 class RandomVariable():
@@ -802,21 +803,21 @@ class Min(RandomVariable):
 
 class Normal(RandomVariable):
     """Represents a normal (Gaussian) distribution.
-    
+
     Generates random samples from a normal distribution with specified
     mean and standard deviation parameters.
-    
+
     Attributes:
         mean: Mean of the distribution (default: 0)
         stdev: Standard deviation of the distribution (default: 1)
-        
+
     Example:
         >>> x = Normal(0, 1)      # Standard normal
         >>> y = Normal(10, 2.5)   # Normal with mean=10, std=2.5
     """
     def __init__(self, mean=0, stdev=1):
         """Initialize normal distribution with mean and standard deviation.
-        
+
         Args:
             mean (float, optional): Mean of the distribution. Defaults to 0.
             stdev (float, optional): Standard deviation. Defaults to 1.
@@ -826,10 +827,10 @@ class Normal(RandomVariable):
 
     def _compile(self, codes, operands):
         """Compile to normal distribution sampling operation.
-        
+
         Pushes mean and standard deviation onto the stack, then emits
         the RANDNORM operation for sampling.
-        
+
         Args:
             codes (list): List to append operation codes to
             operands (list): List to append operands to
@@ -838,6 +839,69 @@ class Normal(RandomVariable):
         self._compileOrPush(codes, operands, self.stdev)
         # self._compileChildren(codes, operands)
         codes.append(OP_RANDNORM)
+        operands.append(0)
+
+#-----------------------------------------------------------------------------------------
+
+class NegativeBinomial(RandomVariable):
+    """Represents a negative binomial distribution.
+
+    Generates random samples from a negative binomial distribution. Can be
+    parameterized either by (n, p) or by (mean, dispersion).
+
+    The negative binomial distribution models the number of failures before
+    achieving n successes, where each trial has probability p of success.
+    It is commonly used in count data modeling, especially when overdispersion
+    is present (variance > mean).
+
+    Parameterization options:
+    1. Direct (n, p): n is number of successes, p is probability of success
+    2. Mean-dispersion: mean and dispersion (alpha) where var = mean + alpha * mean^2
+
+    Attributes:
+        n: Number of successes (shape parameter)
+        p: Probability of success in each trial
+
+    Example:
+        >>> x = NegativeBinomial(n=5, p=0.5)  # Direct parameterization
+        >>> y = NegativeBinomial(mean=10, dispersion=0.5)  # Mean-dispersion form
+    """
+    def __init__(self, mean=None, dispersion=None, n=None, p=None):
+        """Initialize negative binomial distribution.
+
+        Either (n, p) or (mean, dispersion) must be provided.
+
+        Args:
+            mean (float, optional): Mean of the distribution.
+            dispersion (float, optional): Dispersion parameter (alpha).
+                Variance = mean + dispersion * mean^2
+            n (float, optional): Number of successes (shape parameter).
+            p (float, optional): Probability of success in each trial.
+        """
+        if mean is not None and dispersion is not None:
+            # Convert mean-dispersion parameterization to n, p
+            var = mean + dispersion * mean ** 2
+            self.p = mean / var
+            self.n = mean ** 2 / (var - mean)
+        elif n is not None and p is not None:
+            self.n = n
+            self.p = p
+        else:
+            raise ValueError("Either (mean, dispersion) or (n, p) must be provided")
+
+    def _compile(self, codes, operands):
+        """Compile to negative binomial distribution sampling operation.
+
+        Pushes n and p onto the stack, then emits the RAND_NEGBINOM
+        operation for sampling.
+
+        Args:
+            codes (list): List to append operation codes to
+            operands (list): List to append operands to
+        """
+        self._compileOrPush(codes, operands, self.n)
+        self._compileOrPush(codes, operands, self.p)
+        codes.append(OP_RAND_NEGBINOM)
         operands.append(0)
 
 #-----------------------------------------------------------------------------------------
