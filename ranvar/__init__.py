@@ -24,14 +24,14 @@ import builtins
 
 
 
-def P(rv):
+def P(rv, samples=10000):
     """
     Returns the probability that a random var is greater than 0.
     """
     if hasattr(rv, 'cdf'):
         return 1 - rv.cdf(0.5)
     else:
-        rv_ = rv.compute()
+        rv_ = rv.compute(samples=samples)
         # print(rv_._digests.getBins())
         # print(rv_._digests.getWeights())        
         return 1 - rv_.cdf(0.5)
