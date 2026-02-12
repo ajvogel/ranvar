@@ -32,9 +32,19 @@ def P(rv, samples=10000):
         return 1 - rv.cdf(0.5)
     else:
         rv_ = rv.compute(samples=samples)
-        # print(rv_._digests.getBins())
-        # print(rv_._digests.getWeights())        
-        return 1 - rv_.cdf(0.5)
+        digest = rv_._digest
+        bins = digest.getBins()
+        weights = digest.getWeights()
+        n = digest.getActiveBinCount()
+        total_weight = 0.0
+        positive_weight = 0.0
+        for i in range(n):
+            total_weight += weights[i]
+            if bins[i] > 0.5:
+                positive_weight += weights[i]
+        if total_weight == 0:
+            return 0.0
+        return positive_weight / total_weight
 
 
 def E(rv):
