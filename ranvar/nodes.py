@@ -889,6 +889,9 @@ class NegativeBinomial(RandomVariable):
         else:
             raise ValueError("Either (mean, dispersion) or (n, p) must be provided")
 
+    def __repr__(self):
+        return f'<NegativeBinomial(p={self.p}, n={self.n})>'
+
     def _compile(self, codes, operands):
         """Compile to negative binomial distribution sampling operation.
 
