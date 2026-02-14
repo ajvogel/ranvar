@@ -115,7 +115,7 @@ def _randgamma(shape: pyx.double, scale: pyx.double) -> pyx.double:
         u = _rand()
         while u == 0:
             u = _rand()
-        result = result * (u ** (1.0 / shape))
+        result = result * c_exp(c_log(u) / shape)
 
     return result
 
@@ -133,16 +133,21 @@ def _randpoisson(lam: pyx.double) -> pyx.double:
     u: pyx.double
     result: pyx.double
 
+    if lam <= 0:
+        return 0.0
+
     if lam < 30:
         # Knuth's algorithm for small lambda
         L = c_exp(-lam)
         k = 0
         p = 1.0
 
-        while p > L:
+        while True:
             k = k + 1
             u = _rand()
             p = p * u
+            if p <= L:
+                break
 
         result = pyx.cast(pyx.double, k - 1)
     else:
