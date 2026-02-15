@@ -111,9 +111,12 @@ def _randgamma(shape: pyx.double, scale: pyx.double) -> pyx.double:
     result: pyx.double = d * v * scale
 
     # Transform back if original shape < 1
+    # U must be strictly in (0, 1) for the Ahrens-Dieter method.
+    # U == 0 causes log(0) = -inf, and U == 1 causes U^(1/shape) = 1
+    # which skips the scaling entirely, returning Gamma(shape+1) instead of Gamma(shape).
     if shape < 1:
         u = _rand()
-        while u == 0:
+        while u <= 0 or u >= 1:
             u = _rand()
         result = result * c_exp(c_log(u) / shape)
 
