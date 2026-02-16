@@ -86,6 +86,78 @@ def test_normalApprox_quantile():
 
 
 
+def test_ccdf():
+    """Tests that ccdf(k) == 1 - cdf(k) for various points."""
+    std = 100
+    mu  = 100
+    np.random.seed(31337)
+    data = np.random.randn(10_000)*std + mu
+    x = mc.Digest(maxBins=32)
+    for d in data:
+        x.add(d)
+
+    # Test at various points including boundaries
+    test_points = [mu - 2*std, mu - std, mu, mu + std, mu + 2*std]
+    for k in test_points:
+        assert abs(x.ccdf(k) - (1.0 - x.cdf(k))) < 1e-12
+
+    # Boundary conditions
+    assert x.ccdf(x.lower() - 1) == 1.0
+    assert x.ccdf(x.upper() + 1) == 0.0
+
+
+def test_dcdf():
+    """Tests dcdf by verifying it approximates a numerical derivative of cdf."""
+    std = 100
+    mu  = 100
+    np.random.seed(31337)
+    data = np.random.randn(10_000)*std + mu
+    x = mc.Digest(maxBins=32)
+    for d in data:
+        x.add(d)
+
+    # The CDF is piecewise linear, so the derivative should match
+    # a numerical finite difference within a single segment.
+    h = 0.001
+    test_points = [mu - std, mu, mu + std]
+    for k in test_points:
+        numerical_deriv = (x.cdf(k + h) - x.cdf(k - h)) / (2 * h)
+        analytical_deriv = x.dcdf(k)
+        assert abs(numerical_deriv - analytical_deriv) < 1e-4, \
+            f"At k={k}: numerical={numerical_deriv}, analytical={analytical_deriv}"
+
+    # Derivative should be non-negative (CDF is non-decreasing)
+    for k in test_points:
+        assert x.dcdf(k) >= 0
+
+    # Outside the range, derivative should be zero
+    assert x.dcdf(x.lower() - 1) == 0.0
+    assert x.dcdf(x.upper() + 1) == 0.0
+
+
+def test_dccdf():
+    """Tests dccdf by verifying dccdf(k) == -dcdf(k)."""
+    std = 100
+    mu  = 100
+    np.random.seed(31337)
+    data = np.random.randn(10_000)*std + mu
+    x = mc.Digest(maxBins=32)
+    for d in data:
+        x.add(d)
+
+    test_points = [mu - std, mu, mu + std]
+    for k in test_points:
+        assert abs(x.dccdf(k) - (-x.dcdf(k))) < 1e-12
+
+    # CCDF derivative should be non-positive
+    for k in test_points:
+        assert x.dccdf(k) <= 0
+
+    # Outside the range, derivative should be zero
+    assert x.dccdf(x.lower() - 1) == 0.0
+    assert x.dccdf(x.upper() + 1) == 0.0
+
+
 def test_pickle():
     std = 100
     mu  = 100

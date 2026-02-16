@@ -417,14 +417,47 @@ class DigestVariable(RandomVariable):
 
     def cdf(self, k):
         """Compute the cumulative distribution function.
-        
+
         Args:
             k (float): Value at which to evaluate the CDF
-            
+
         Returns:
             float: Estimated CDF value between 0 and 1
         """
         return self._digest.cdf(k)
+
+    def ccdf(self, k):
+        """Compute the complementary cumulative distribution function.
+
+        Args:
+            k (float): Value at which to evaluate the CCDF
+
+        Returns:
+            float: Estimated CCDF value between 0 and 1
+        """
+        return self._digest.ccdf(k)
+
+    def dcdf(self, k):
+        """Compute the derivative of the CDF at a given point.
+
+        Args:
+            k (float): Value at which to evaluate the derivative
+
+        Returns:
+            float: Estimated derivative of the CDF at k
+        """
+        return self._digest.dcdf(k)
+
+    def dccdf(self, k):
+        """Compute the derivative of the CCDF at a given point.
+
+        Args:
+            k (float): Value at which to evaluate the derivative
+
+        Returns:
+            float: Derivative of the CCDF at k (always <= 0)
+        """
+        return self._digest.dccdf(k)
 
     def lower(self):
         """Get the minimum value in the distribution.
