@@ -495,6 +495,101 @@ class Digest():
 
     @pyx.ccall
     @pyx.boundscheck(False)
+    @pyx.wraparound(False)
+    @pyx.cdivision(True)
+    @pyx.initializedcheck(False)
+    def ccdf(self, k:pyx.double) -> pyx.double:
+        """Compute the complementary cumulative distribution function at a given point.
+
+        The CCDF is defined as 1 - CDF(k), representing the probability that a
+        random variable takes a value greater than k.
+
+        Args:
+            k (float): The point at which to evaluate the CCDF.
+
+        Returns:
+            float: Estimated CCDF value between 0 and 1.
+        """
+        return 1.0 - self.cdf(k)
+
+    @pyx.ccall
+    @pyx.boundscheck(False)
+    @pyx.wraparound(False)
+    @pyx.cdivision(True)
+    @pyx.initializedcheck(False)
+    def dcdf(self, k:pyx.double) -> pyx.double:
+        """Compute the derivative of the CDF at a given point.
+
+        The derivative of the CDF is the probability density function (PDF).
+        Since the t-digest CDF is piecewise linear between centroids, the
+        derivative is piecewise constant — equal to the slope of the CDF
+        in the interval containing k.
+
+        Args:
+            k (float): The point at which to evaluate the derivative.
+
+        Returns:
+            float: Estimated PDF value (derivative of CDF) at k.
+        """
+        som:pyx.double = 0
+        i:pyx.int
+        g:pyx.double
+        yi:pyx.double
+        yi_n:pyx.double
+
+        c = self._bins
+        m = self._cnts
+
+        if k <= self.lower():
+            return 0.
+        elif k >= self.upper():
+            return 0.
+        else:
+            for i in range(self.nActive):
+                if c[i] <= k < c[i+1]:
+                    if (m[i] > 1) & (m[i+1] > 1):
+                        yi   = som + m[i]/2
+                        yi_n = yi + (m[i+1] + m[i]) / 2
+
+                    elif (m[i] == 1) & (m[i+1] > 1):
+                        yi   = som
+                        yi_n = yi + (m[i+1]) / 2
+
+                    elif (m[i] > 1) & (m[i+1] == 1):
+                        yi   = som + m[i]/2
+                        yi_n = yi + (m[i]) / 2
+                    else:
+                        yi   = som
+                        yi_n = yi
+
+                    g = (yi_n - yi) / (c[i+1] - c[i])
+
+                    return g / self._sumWeights()
+
+                else:
+                    som += m[i]
+
+    @pyx.ccall
+    @pyx.boundscheck(False)
+    @pyx.wraparound(False)
+    @pyx.cdivision(True)
+    @pyx.initializedcheck(False)
+    def dccdf(self, k:pyx.double) -> pyx.double:
+        """Compute the derivative of the complementary CDF at a given point.
+
+        Since CCDF(k) = 1 - CDF(k), its derivative is the negation of the
+        CDF derivative: dCCDF/dk = -dCDF/dk = -PDF(k).
+
+        Args:
+            k (float): The point at which to evaluate the derivative.
+
+        Returns:
+            float: Derivative of the CCDF at k (always <= 0).
+        """
+        return -self.dcdf(k)
+
+    @pyx.ccall
+    @pyx.boundscheck(False)
     @pyx.cdivision(True)
     @pyx.wraparound(False)
     @pyx.initializedcheck(False)
