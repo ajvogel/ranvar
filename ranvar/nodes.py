@@ -942,6 +942,43 @@ class NegativeBinomial(RandomVariable):
 
 #-----------------------------------------------------------------------------------------
 
+class Gamma(RandomVariable):
+    """Represents a shifted gamma distribution.
+
+    Generates random samples from a gamma distribution parameterised by shape,
+    scale, and location. The location shifts the distribution to the right so
+    the minimum value is location rather than zero.
+
+    Attributes:
+        shape: Shape parameter (k > 0)
+        scale: Scale parameter (θ > 0)
+        location: Left shift / minimum value of the distribution (default: 0)
+
+    Example:
+        >>> x = Gamma(shape=2, scale=3)         # Gamma(2, 3) starting at 0
+        >>> y = Gamma(shape=2, scale=3, location=5)  # Same but shifted to start at 5
+    """
+    def __init__(self, shape, scale, location=0):
+        """Initialize shifted gamma distribution.
+
+        Args:
+            shape (float): Shape parameter (k > 0).
+            scale (float): Scale parameter (θ > 0).
+            location (float, optional): Location shift. Defaults to 0.
+        """
+        self.shape = shape
+        self.scale = scale
+        self.location = location
+
+    def _compile(self, codes, operands):
+        self._compileOrPush(codes, operands, self.shape)
+        self._compileOrPush(codes, operands, self.scale)
+        self._compileOrPush(codes, operands, self.location)
+        codes.append(OP_RAND_GAMMA)
+        operands.append(0)
+
+#-----------------------------------------------------------------------------------------
+
 class Summation(RandomVariable):
     """
     Represents a mathematical summation (Σ) operation.

@@ -220,6 +220,7 @@ _RAND_QUANTILES = pyx.declare(pyx.int, 102)
 _ARRAY_SUM = pyx.declare(pyx.int, 103)
 _RAND_HIST = pyx.declare(pyx.int, 104)
 _RAND_NEGBINOM = pyx.declare(pyx.int, 105)
+_RAND_GAMMA = pyx.declare(pyx.int, 106)
 
 @pyx.cclass
 class VirtualMachine():
@@ -640,6 +641,19 @@ class VirtualMachine():
         self.pushStack(_randnegbinom(n, p))
 
     @pyx.cfunc
+    def _randGamma(self) -> pyx.void:
+        """Generate a random number from a shifted gamma distribution.
+
+        Pops three values from the stack (shape, scale, location) and pushes
+        a random number drawn from Gamma(shape, scale) shifted right by location.
+        """
+        location: pyx.double = self.popStack()
+        scale: pyx.double = self.popStack()
+        shape: pyx.double = self.popStack()
+
+        self.pushStack(_randgamma(shape, scale) + location)
+
+    @pyx.cfunc
     def _arraySum(self, nArray: pyx.double) -> pyx.void:
         """Sum elements from an array within a specified range.
 
@@ -878,6 +892,8 @@ class VirtualMachine():
                 self._randHist(operand)
             elif opCode == _RAND_NEGBINOM:
                 self._randNegBinom()
+            elif opCode == _RAND_GAMMA:
+                self._randGamma()
 
             self.counter += 1
 
