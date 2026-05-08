@@ -1,6 +1,6 @@
 [project]
 name = "ranvar"
-version = "0.8.0rc2"
+version = "0.8.1"
 # dynamic = ["version"]
 description = "RanVar enables fast probabilistic modelling"
 authors = [{ name = "Adolph Vogel", email = "ajvogel@gmail.com" }]
