@@ -1,6 +1,6 @@
 [project]
 name = "ranvar"
-version = "0.8.0rc2"
+version = "0.8.1"
 # dynamic = ["version"]
 description = "RanVar enables fast probabilistic modelling"
 authors = [{ name = "Adolph Vogel", email = "ajvogel@gmail.com" }]
@@ -46,5 +46,5 @@ dev = [
 
 
 [build-system]
-requires = ["setuptools>=80", "cython>=3.1.2","versioningit"]
+requires = ["setuptools>=80", "cython>=3.1.2", "versioningit", "numpy>=2.3.2"]
 build-backend = "setuptools.build_meta"
