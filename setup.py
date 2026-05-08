@@ -31,14 +31,21 @@
 # setup(**setup_kwargs)
 
 
+import numpy as np
 from Cython.Build import cythonize
-from setuptools import setup
+from setuptools import Extension, setup
+
+extensions = [
+    Extension("ranvar.random", ["ranvar/random.py"]),
+    Extension("ranvar.vm", ["ranvar/vm.py"]),
+    Extension("ranvar.digest", ["ranvar/digest.py"], include_dirs=[np.get_include()]),
+]
 
 setup(
     name="ranvar",
     ext_modules=cythonize(
-        ["ranvar/vm.py", "ranvar/digest.py"],
-        include_path=["ranvar/"],
+        extensions,
+        include_path=["ranvar/", np.get_include()],
         force=True,
         annotate=True,
     ),
