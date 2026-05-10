@@ -156,6 +156,23 @@ def randpoisson(lam: pyx.double) -> pyx.double:
 
 @pyx.cfunc
 @pyx.cdivision(True)
+def randpert(low: pyx.double, mode: pyx.double, high: pyx.double) -> pyx.double:
+    """
+    Sample from a PERT distribution parameterised by minimum, most-likely, and maximum.
+    Uses a Beta(α, β) variate via the Gamma-ratio method where
+    α = 1 + 4*(mode-low)/(high-low) and β = 1 + 4*(high-mode)/(high-low).
+    https://en.wikipedia.org/wiki/PERT_distribution
+    """
+    span: pyx.double = high - low
+    alpha: pyx.double = 1.0 + 4.0 * (mode - low) / span
+    beta: pyx.double  = 1.0 + 4.0 * (high - mode) / span
+    g1: pyx.double = randgamma(alpha, 1.0)
+    g2: pyx.double = randgamma(beta,  1.0)
+    return low + span * g1 / (g1 + g2)
+
+
+@pyx.cfunc
+@pyx.cdivision(True)
 def randnegbinom(n: pyx.double, p: pyx.double) -> pyx.double:
     """
     Sample from negative binomial distribution with parameters n and p.

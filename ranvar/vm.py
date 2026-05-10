@@ -5,7 +5,7 @@ from .digest import Digest
 
 if pyx.compiled:
     from cython.cimports.libc.math import floor as c_floor
-    from cython.cimports.ranvar.random import rand, randint, randnorm, randexp, randgamma, randpoisson, randnegbinom
+    from cython.cimports.ranvar.random import rand, randint, randnorm, randexp, randgamma, randpoisson, randnegbinom, randpert
 else:
     pass
 
@@ -51,6 +51,7 @@ _ARRAY_SUM = pyx.declare(pyx.int, 103)
 _RAND_HIST = pyx.declare(pyx.int, 104)
 _RAND_NEGBINOM = pyx.declare(pyx.int, 105)
 _RAND_GAMMA = pyx.declare(pyx.int, 106)
+_RAND_PERT = pyx.declare(pyx.int, 107)
 
 @pyx.cclass
 class VirtualMachine():
@@ -484,6 +485,19 @@ class VirtualMachine():
         self.pushStack(randgamma(shape, scale) + location)
 
     @pyx.cfunc
+    def _randPert(self) -> pyx.void:
+        """Generate a random number from a PERT distribution.
+
+        Pops three values from the stack (low, mode, high) and pushes
+        a random number drawn from PERT(low, mode, high).
+        """
+        high: pyx.double = self.popStack()
+        mode: pyx.double = self.popStack()
+        low:  pyx.double = self.popStack()
+
+        self.pushStack(randpert(low, mode, high))
+
+    @pyx.cfunc
     def _arraySum(self, nArray: pyx.double) -> pyx.void:
         """Sum elements from an array within a specified range.
 
@@ -724,6 +738,8 @@ class VirtualMachine():
                 self._randNegBinom()
             elif opCode == _RAND_GAMMA:
                 self._randGamma()
+            elif opCode == _RAND_PERT:
+                self._randPert()
 
             self.counter += 1
 
