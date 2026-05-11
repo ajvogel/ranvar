@@ -1,7 +1,7 @@
 # from .distributions import *
 # from . import nbinom
 from .vm import *
-from .digest import *
+from .digest_cpp import Digest
 from .nodes import *
 from .opcodes import *
 import numpy as np

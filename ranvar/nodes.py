@@ -1,6 +1,6 @@
 from typing import SupportsAbs
 import numpy as np
-from .digest import Digest
+from .digest_cpp import Digest
 from .vm import VirtualMachine
 from .opcodes import *
 
@@ -17,459 +17,506 @@ class RandomVariable():
     - Arithmetic: +, -, *, /, //, %, **
     - Comparisons: <, <=, >, >=
     - Matrix multiplication (@) for summation operations
+    - Negation and absolute value
     
-    Each operation creates a new node in an expression tree that can be compiled
-    into bytecode for execution by the VirtualMachine class.
+    When computed, each RandomVariable generates a Monte Carlo simulation that
+    produces a Digest (t-digest) summarizing the output distribution.
     
-    Attributes:
-        children (list): Child nodes in the expression tree
-        
     Example:
-        >>> x = Normal(0, 1)  # Normal distribution
-        >>> y = Uniform(0, 10)  # Uniform distribution
-        >>> z = x + y * 2  # Combined expression
-        >>> result = z.compute()  # Monte Carlo simulation
+        >>> x = Normal(0, 1)
+        >>> y = Normal(2, 1)  
+        >>> z = x + y  # Creates expression tree
+        >>> result = z.compute()  # Runs Monte Carlo simulation
+        >>> result.quantile(0.5)  # Get median
     """
-    def __init__(self, *args):
-        """Initialize a random variable with child nodes.
-        
-        Args:
-            *args: Variable number of child nodes (other RandomVariable instances or constants)
-        """
-        self.children = list(args)
-
     def __add__(self, other):
-        """Addition operator (+).
-        
-        Args:
-            other: Right operand (RandomVariable or numeric constant)
-            
-        Returns:
-            Add: New addition node in the expression tree
-        """
         return Add(self, other)
 
     def __radd__(self, other):
-        """Reverse addition operator (supports constant + RandomVariable).
-        
-        Args:
-            other: Left operand (typically a numeric constant)
-            
-        Returns:
-            Add: New addition node in the expression tree
-        """
         return Add(other, self)
 
     def __sub__(self, other):
-        """Subtraction operator (-).
-        
-        Args:
-            other: Right operand (RandomVariable or numeric constant)
-            
-        Returns:
-            Sub: New subtraction node in the expression tree
-        """
         return Sub(self, other)
 
     def __rsub__(self, other):
-        """Reverse subtraction operator (supports constant - RandomVariable).
-        
-        Args:
-            other: Left operand (typically a numeric constant)
-            
-        Returns:
-            Sub: New subtraction node in the expression tree
-        """
-        return Sub(other, self)    
+        return Sub(other, self)
+
+    def __neg__(self):
+        return Neg(self)
+
+    def __abs__(self):
+        return Abs(self)
 
     def __mul__(self, other):
-        """Multiplication operator (*).
-        
-        Args:
-            other: Right operand (RandomVariable or numeric constant)
-            
-        Returns:
-            Mul: New multiplication node in the expression tree
-        """
         return Mul(self, other)
 
     def __rmul__(self, other):
-        """Reverse multiplication operator (supports constant * RandomVariable).
-        
-        Args:
-            other: Left operand (typically a numeric constant)
-            
-        Returns:
-            Mul: New multiplication node in the expression tree
-        """
-        return Mul(other, self)    
-
-    def __pow__(self, other):
-        """Exponentiation operator (**).
-        
-        Args:
-            other: Exponent (RandomVariable or numeric constant)
-            
-        Returns:
-            Pow: New power node in the expression tree
-        """
-        return Pow(self, other)
+        return Mul(other, self)
 
     def __truediv__(self, other):
-        """Division operator (/).
-        
-        Args:
-            other: Divisor (RandomVariable or numeric constant)
-            
-        Returns:
-            Div: New division node in the expression tree
-        """
         return Div(self, other)
 
-    def __mod__(self, other):
-        """Modulo operator (%).
-        
-        Args:
-            other: Divisor (RandomVariable or numeric constant)
-            
-        Returns:
-            Mod: New modulo node in the expression tree
-        """
-        return Mod(self, other)
+    def __rtruediv__(self, other):
+        return Div(other, self)
 
     def __floordiv__(self, other):
-        """Floor division operator (//).
-        
-        Args:
-            other: Divisor (RandomVariable or numeric constant)
-            
-        Returns:
-            FloorDiv: New floor division node in the expression tree
-        """
         return FloorDiv(self, other)
 
-    def __matmul__(self, other):
-        """Matrix multiplication operator (@) - used for summation.
-        
-        This operator is overloaded to represent summation operations
-        in Monte Carlo contexts, typically for computing expected values
-        or aggregating random variables.
-        
-        Args:
-            other: Right operand (RandomVariable or numeric constant)
-            
-        Returns:
-            Summation: New summation node in the expression tree
-        """
-        return Summation(self, other)
-
-    def __rmatmul__(self, other):
-        """Reverse matrix multiplication operator (supports constant @ RandomVariable).
-        
-        Args:
-            other: Left operand (typically a numeric constant)
-            
-        Returns:
-            Summation: New summation node in the expression tree
-        """
-        return Summation(other, self)
-
-    def __divmod__(self, other):
-        """Divmod operator - not implemented.
-        
-        Args:
-            other: Right operand
-        """
-        pass
-
-    def __rtruediv__(self, other):
-        """Reverse division operator - not implemented.
-        
-        Args:
-            other: Left operand
-        """
-        pass
-
     def __rfloordiv__(self, other):
-        """Reverse floor division operator - not implemented.
-        
-        Args:
-            other: Left operand
-        """
-        pass
+        return FloorDiv(other, self)
 
-    def __rdivmod__(self, other):
-        """Reverse divmod operator - not implemented.
-        
-        Args:
-            other: Left operand
-        """
-        pass
+    def __mod__(self, other):
+        return Mod(self, other)
+
+    def __rmod__(self, other):
+        return Mod(other, self)
+
+    def __pow__(self, other):
+        return Pow(self, other)
+
+    def __rpow__(self, other):
+        return Pow(other, self)
+
+    def __matmul__(self, other):
+        return Sum(self, other)
 
     def __lt__(self, other):
-        """Less than operator (<).
-        
-        Args:
-            other: Right operand (RandomVariable or numeric constant)
-            
-        Returns:
-            LessThan: New less-than comparison node in the expression tree
-        """
-        return LessThan(self, other)
+        return Lt(self, other)
 
     def __le__(self, other):
-        """Less than or equal operator (<=).
-        
-        Args:
-            other: Right operand (RandomVariable or numeric constant)
-            
-        Returns:
-            LessThanEqual: New less-than-or-equal comparison node in the expression tree
-        """
-        return LessThanEqual(self, other)
+        return Lte(self, other)
 
     def __gt__(self, other):
-        """Greater than operator (>).
-        
-        Implemented by reversing the operands of less-than.
-        
-        Args:
-            other: Right operand (RandomVariable or numeric constant)
-            
-        Returns:
-            LessThan: New less-than comparison node with reversed operands
-        """
-        return LessThan(other, self)
+        return Gt(self, other)
 
     def __ge__(self, other):
-        """Greater than or equal operator (>=).
-        
-        Implemented by reversing the operands of less-than-or-equal.
-        
-        Args:
-            other: Right operand (RandomVariable or numeric constant)
-            
-        Returns:
-            LessThanEqual: New less-than-or-equal comparison node with reversed operands
-        """
-        return LessThanEqual(other, self)
+        return Gte(self, other)
 
-    def mean(self, samples=10000):
-        return self.compute(samples=samples).mean()
-        
-    def printTree(self, level=0):
-        """Print a visual representation of the expression tree.
-        
-        Recursively prints the tree structure with indentation to show
-        the hierarchy of operations and operands.
-        
-        Args:
-            level (int, optional): Current indentation level. Defaults to 0.
-        """
-        print(' '*level*4+self.__class__.__name__)
-        for c in self.children:
-            if hasattr(c, 'printTree'):
-                c.printTree(level+1)
-            else:
-                print(' '*(level + 1)*4+str(c))
+    def __max__(self, other):
+        return Max(self, other)
 
-    def _compile(self, codes, operands):
-        """Compile this node into VM bytecode (abstract method).
-        
-        This method should be overridden by subclasses to generate
-        the appropriate bytecode instructions for their operation.
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-        pass
-
-    def _compileOrPush(self, codes, operands, child):
-        """Compile a child node or push a constant value.
-        
-        If the child is a RandomVariable, compile it recursively.
-        Otherwise, treat it as a constant and generate a PUSH instruction.
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-            child: Child node (RandomVariable) or constant value
-        """
-        if hasattr(child, '_compile'):
-            child._compile(codes, operands)
-        else:
-            codes.append(OP_PUSH)
-            operands.append(child)
+    def __min__(self, other):
+        return Min(self, other)
 
 
-    def _compileChildren(self, codes, operands):
-        """Compile all child nodes in order.
+class Constant(RandomVariable):
+    """
+    A random variable that always returns a fixed constant value.
+    
+    This class wraps a constant numeric value in the RandomVariable interface,
+    allowing constants to participate in algebraic expressions with other
+    random variables.
+    
+    Args:
+        value: The constant numeric value
         
-        Helper method that compiles each child node, useful for operations
-        that need to process multiple operands.
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-        for c in self.children:
-            self._compileOrPush(codes, operands, c)
+    Example:
+        >>> c = Constant(5)
+        >>> x = Normal(0, 1)
+        >>> result = (x + c).compute()  # Shifts normal by 5
+    """
+    def __init__(self, value):
+        self.value = value
 
-    def compile(self):
-        """Compile the entire expression tree into VM bytecode.
-        
-        Traverses the expression tree and generates arrays of operation
-        codes and operands that can be executed by the VirtualMachine.
-        
-        Returns:
-            tuple: (codes, operands) as numpy arrays
-                - codes: Array of operation codes
-                - operands: Array of corresponding operands
-        """
-        codes    = []
-        operands = []
-        self._compile(codes, operands)
-
-        codes = np.array(codes, dtype=np.double)
-        operands = np.array(operands, dtype=np.double)
-        return codes, operands
-
-    def sample(self):
-        """Generate a single sample from the random variable.
-        
-        Compiles the expression tree and executes it once using the
-        VirtualMachine to produce a single random sample.
-        
-        Returns:
-            float: A single sample from the distribution
-        """
-        codes, operands = self.compile()
-        vm = VirtualMachine(codes, operands)
-        return vm.sample()
-
-    def compute(self, samples=10000, maxBins=32):
-        """Perform Monte Carlo simulation to estimate the distribution.
-        
-        Compiles the expression tree and runs it multiple times to build
-        a statistical approximation of the resulting distribution using
-        a t-digest data structure.
-        
-        Args:
-            samples (int, optional): Number of Monte Carlo samples. Defaults to 10000.
-            maxBins (int, optional): Maximum bins for the t-digest. Defaults to 32.
-            
-        Returns:
-            DigestVariable: A wrapper around the t-digest containing the
-                           estimated distribution
-        """
-        # print('Compiling...')
-        codes, operands = self.compile()
-        vm = VirtualMachine(codes, operands)
-        # print('Simulating...')
-        digest =  vm.compute(samples=samples, maxBins=maxBins)
-        return DigestVariable(digest)
+    def _compile(self, vm=None):
+        if vm is None:
+            vm = VirtualMachine(np.zeros(1, dtype=np.int64), np.zeros(1))
+        vm.codes    = np.append(vm.codes,    _PUSH)
+        vm.operands = np.append(vm.operands, self.value)
+        return vm
 
 
+class BinaryOp(RandomVariable):
+    """
+    Base class for binary operations on random variables.
+    
+    Represents an operation applied to two operands (left and right), which
+    can be either RandomVariable instances or constants. Constants are
+    automatically wrapped in Constant nodes.
+    
+    Args:
+        left: Left operand (RandomVariable or numeric)
+        right: Right operand (RandomVariable or numeric)
+    """
+    def __init__(self, left, right):
+        if not isinstance(left, RandomVariable):
+            left  = Constant(left)
+        if not isinstance(right, RandomVariable):
+            right = Constant(right)
 
-#-----------------------------------------------------------------------------------------
+        self.left  = left
+        self.right = right
+
+    def _compile(self, vm=None):
+        if vm is None:
+            vm = VirtualMachine(np.zeros(1, dtype=np.int64), np.zeros(1))
+        vm = self.left._compile(vm)
+        vm = self.right._compile(vm)
+        vm.codes    = np.append(vm.codes,    self.opCode)
+        vm.operands = np.append(vm.operands, 0)
+        return vm
+
+
+class Add(BinaryOp):
+    opCode = _ADD
+
+class Sub(BinaryOp):
+    opCode = _SUB
+
+class Mul(BinaryOp):
+    opCode = _MUL
+
+class Div(BinaryOp):
+    opCode = _DIV
+
+class Mod(BinaryOp):
+    opCode = _MOD
+
+class FloorDiv(BinaryOp):
+    opCode = _FLOORDIV
+
+class Pow(BinaryOp):
+    opCode = _POW
+
+class Max(BinaryOp):
+    opCode = _MAX
+
+class Min(BinaryOp):
+    opCode = _MIN
+
+class Gt(BinaryOp):
+    opCode = _GT
+
+class Gte(BinaryOp):
+    opCode = _GTE
+
+class Lt(BinaryOp):
+    opCode = _LT
+
+class Lte(BinaryOp):
+    opCode = _LTE
+
+
+class UnaryOp(RandomVariable):
+    """
+    Base class for unary operations on random variables.
+    
+    Represents an operation applied to a single operand, which
+    can be either a RandomVariable instance or a constant.
+    Constants are automatically wrapped in Constant nodes.
+    
+    Args:
+        operand: The operand (RandomVariable or numeric)
+    """
+    def __init__(self, operand):
+        if not isinstance(operand, RandomVariable):
+            operand = Constant(operand)
+        self.operand = operand
+
+    def _compile(self, vm=None):
+        if vm is None:
+            vm = VirtualMachine(np.zeros(1, dtype=np.int64), np.zeros(1))
+        vm = self.operand._compile(vm)
+        vm.codes    = np.append(vm.codes,    self.opCode)
+        vm.operands = np.append(vm.operands, 0)
+        return vm
+
+
+class Neg(UnaryOp):
+    opCode = _NEG
+
+class Abs(UnaryOp):
+    opCode = _ABS
+
+
+class Sum(RandomVariable):
+    """Sum of multiple independent samples from a distribution.
+    
+    The Sum node implements the @ operator (matrix multiplication) to create
+    a new random variable representing the sum of n independent samples from
+    the distribution. This is useful for modeling aggregate quantities like
+    total claims, portfolio returns, or cumulative effects.
+    
+    Args:
+        left (RandomVariable): The distribution to sample from
+        right (int or RandomVariable): The number of samples to sum
+        
+    Example:
+        >>> d = RandInt(1, 6)  # Die roll
+        >>> total = d @ 5      # Sum of 5 dice
+        >>> result = total.compute()
+    """
+    def __init__(self, left, right):
+        self.left  = left
+        self.right = right
+
+    def _compile(self, vm=None):
+        if vm is None:
+            vm = VirtualMachine(np.zeros(1, dtype=np.int64), np.zeros(1))
+
+        n = self.right
+
+        for _ in range(n):
+            vm = self.left._compile(vm)
+            if _ > 0:
+                vm.codes    = np.append(vm.codes,    _ADD)
+                vm.operands = np.append(vm.operands, 0)
+
+        return vm
+
+
+class RandInt(RandomVariable):
+    """Random integer uniformly distributed between low and high (inclusive).
+    
+    Generates random integers from a discrete uniform distribution over
+    the range [low, high]. This is useful for modeling dice rolls, random
+    counts, or any discrete uniform random variable.
+    
+    Args:
+        low (int): Minimum value (inclusive)
+        high (int): Maximum value (inclusive)
+        
+    Example:
+        >>> die = RandInt(1, 6)  # Standard six-sided die
+        >>> result = die.compute(samples=10000)
+        >>> result.quantile(0.5)  # Approximately 3 or 4
+    """
+    def __init__(self, low, high):
+        self.low  = low
+        self.high = high
+
+    def _compile(self, vm=None):
+        if vm is None:
+            vm = VirtualMachine(np.zeros(1, dtype=np.int64), np.zeros(1))
+        vm.codes    = np.append(vm.codes,    [_PUSH, _PUSH, _RANDINT])
+        vm.operands = np.append(vm.operands, [self.low, self.high, 0])
+        return vm
+
+
+class Normal(RandomVariable):
+    """Random variable following a normal (Gaussian) distribution.
+    
+    Generates samples from a normal distribution with specified mean and
+    standard deviation. Useful for modeling quantities that cluster around
+    a central value with symmetric variation.
+    
+    Args:
+        mu (float): Mean (location parameter)
+        sigma (float): Standard deviation (scale parameter, must be > 0)
+        
+    Example:
+        >>> height = Normal(170, 10)  # Height in cm
+        >>> result = height.compute()
+        >>> result.quantile(0.5)  # Approximately 170
+    """
+    def __init__(self, mu, sigma):
+        self.mu    = mu
+        self.sigma = sigma
+
+    def _compile(self, vm=None):
+        if vm is None:
+            vm = VirtualMachine(np.zeros(1, dtype=np.int64), np.zeros(1))
+        vm.codes    = np.append(vm.codes,    [_PUSH, _PUSH, _RANDNORM])
+        vm.operands = np.append(vm.operands, [self.mu, self.sigma, 0])
+        return vm
+
+
+class Exp(RandomVariable):
+    """Random variable following an exponential distribution.
+    
+    Generates samples from an exponential distribution with specified rate
+    parameter (lambda). Useful for modeling waiting times, service times,
+    or decay processes.
+    
+    Args:
+        lam (float): Rate parameter (lambda, must be > 0). The mean of
+                    the distribution is 1/lam.
+        
+    Example:
+        >>> wait_time = Exp(0.5)  # Average wait of 2 units
+        >>> result = wait_time.compute()
+    """
+    def __init__(self, lam):
+        self.lam = lam
+
+    def _compile(self, vm=None):
+        if vm is None:
+            vm = VirtualMachine(np.zeros(1, dtype=np.int64), np.zeros(1))
+        vm.codes    = np.append(vm.codes,    [_PUSH, _RANDEXP])
+        vm.operands = np.append(vm.operands, [self.lam, 0])
+        return vm
+
+
+class Gamma(RandomVariable):
+    """Random variable following a gamma distribution.
+    
+    Generates samples from a gamma distribution with shape k, scale theta,
+    and optional location parameter.
+    
+    Args:
+        k (float): Shape parameter (must be > 0)
+        theta (float): Scale parameter (must be > 0). Mean = k * theta.
+        loc (float, optional): Location (shift) parameter. Defaults to 0.
+        
+    Example:
+        >>> x = Gamma(2.0, 3.0)  # Shape=2, Scale=3, mean=6
+        >>> result = x.compute()
+        >>> result.mean()  # Approximately 6
+    """
+    def __init__(self, k, theta, loc=0):
+        self.k     = k
+        self.theta = theta
+        self.loc   = loc
+
+    def _compile(self, vm=None):
+        if vm is None:
+            vm = VirtualMachine(np.zeros(1, dtype=np.int64), np.zeros(1))
+        vm.codes    = np.append(vm.codes,    [_PUSH, _PUSH, _PUSH, _RANDGAMMA])
+        vm.operands = np.append(vm.operands, [self.k, self.theta, self.loc, 0])
+        return vm
+
+
+class Poisson(RandomVariable):
+    """Random variable following a Poisson distribution.
+    
+    Generates samples from a Poisson distribution with specified rate
+    parameter lambda. Useful for modeling count data or rare events.
+    
+    Args:
+        lam (float): Rate parameter (lambda, must be > 0). Both the mean
+                    and variance of the distribution equal lambda.
+        
+    Example:
+        >>> arrivals = Poisson(3.5)  # Average 3.5 arrivals per period
+        >>> result = arrivals.compute()
+    """
+    def __init__(self, lam):
+        self.lam = lam
+
+    def _compile(self, vm=None):
+        if vm is None:
+            vm = VirtualMachine(np.zeros(1, dtype=np.int64), np.zeros(1))
+        vm.codes    = np.append(vm.codes,    [_PUSH, _RANDPOISSON])
+        vm.operands = np.append(vm.operands, [self.lam, 0])
+        return vm
+
+
+class NegBinom(RandomVariable):
+    """Random variable following a negative binomial distribution.
+    
+    Generates samples from a negative binomial distribution. Models the
+    number of successes before r failures occur, with each trial having
+    probability p of success.
+    
+    Args:
+        r (float): Number of failures until the experiment is stopped
+        p (float): Probability of success in each trial (0 < p < 1)
+        
+    Example:
+        >>> x = NegBinom(5, 0.4)  # r=5 failures, p=0.4 success prob
+        >>> result = x.compute()
+    """
+    def __init__(self, r, p):
+        self.r = r
+        self.p = p
+
+    def _compile(self, vm=None):
+        if vm is None:
+            vm = VirtualMachine(np.zeros(1, dtype=np.int64), np.zeros(1))
+        vm.codes    = np.append(vm.codes,    [_PUSH, _PUSH, _RANDNEGBINOM])
+        vm.operands = np.append(vm.operands, [self.r, self.p, 0])
+        return vm
+
+
+class Pert(RandomVariable):
+    """Random variable following a PERT (Program Evaluation and Review Technique) distribution.
+    
+    The PERT distribution is a smooth approximation of a triangular distribution,
+    parameterized by minimum, most likely (mode), and maximum values. It is widely
+    used in project management and risk analysis for modeling bounded uncertain quantities.
+    
+    The shape is controlled by a lambda parameter that determines the relative weight
+    of the mode compared to the endpoints. Higher lambda values create a sharper
+    peak near the mode.
+    
+    Args:
+        low (float): Minimum possible value
+        mode (float): Most likely value (must satisfy low < mode < high)
+        high (float): Maximum possible value
+        lam (float, optional): Shape parameter controlling the peak sharpness.
+                              Defaults to 4.0.
+        
+    Example:
+        >>> duration = Pert(3, 5, 10)  # Task duration: min=3, likely=5, max=10
+        >>> result = duration.compute()
+        >>> result.mean()  # Approximately (3 + 4*5 + 10) / 6 ≈ 5.5
+    """
+    def __init__(self, low, mode, high, lam=4.0):
+        self.low  = low
+        self.mode = mode
+        self.high = high
+        self.lam  = lam
+
+    def _compile(self, vm=None):
+        if vm is None:
+            vm = VirtualMachine(np.zeros(1, dtype=np.int64), np.zeros(1))
+        vm.codes    = np.append(vm.codes,    [_PUSH, _PUSH, _PUSH, _PUSH, _RANDPERT])
+        vm.operands = np.append(vm.operands, [self.low, self.mode, self.high, self.lam, 0])
+        return vm
+
 
 class DigestVariable(RandomVariable):
     """
     Wrapper for Digest objects to enable use in algebraic operations.
-    
+
     This class wraps a t-digest data structure in a RandomVariable interface,
-    allowing statistical distributions computed from Monte Carlo simulations
-    to be used as operands in further algebraic expressions.
-    
+    allowing pre-computed distributions to participate in expression trees
+    and Monte Carlo simulations alongside parametric distributions.
+
     The DigestVariable provides access to the underlying t-digest's statistical
     methods (quantile, CDF, bounds) while also enabling the digest to be compiled
     into VM bytecode for sampling operations. When compiled, the digest is converted
-    into a histogram representation suitable for random sampling.
-    
-    Attributes:
+    to a histogram representation for efficient random sampling in the VM.
+
         _digest (Digest): The underlying t-digest data structure
-        
+
     Example:
-        >>> x = Normal(0, 1)
         >>> result = x.compute()  # Returns DigestVariable
-        >>> median = result.quantile(0.5)
-        >>> y = result + 10  # Can be used in further operations
     """
     def __init__(self, digest: Digest):
         """Initialize with a t-digest.
-        
+
         Args:
             digest (Digest): The t-digest data structure to wrap
         """
         self._digest = digest
 
     def quantile(self, q):
-        """Compute the quantile of the distribution.
-        
-        Args:
-            q (float): Quantile probability between 0 and 1
-            
-        Returns:
-            float: Estimated quantile value
-        """
         return self._digest.quantile(q)
 
     def cdf(self, k):
-        """Compute the cumulative distribution function.
-
-        Args:
-            k (float): Value at which to evaluate the CDF
-
-        Returns:
-            float: Estimated CDF value between 0 and 1
-        """
         return self._digest.cdf(k)
 
     def ccdf(self, k):
-        """Compute the complementary cumulative distribution function.
-
-        Args:
-            k (float): Value at which to evaluate the CCDF
-
-        Returns:
-            float: Estimated CCDF value between 0 and 1
-        """
         return self._digest.ccdf(k)
 
     def dcdf(self, k):
-        """Compute the derivative of the CDF at a given point.
-
-        Args:
-            k (float): Value at which to evaluate the derivative
-
-        Returns:
-            float: Estimated derivative of the CDF at k
-        """
         return self._digest.dcdf(k)
 
     def dccdf(self, k):
-        """Compute the derivative of the CCDF at a given point.
-
-        Args:
-            k (float): Value at which to evaluate the derivative
-
-        Returns:
-            float: Derivative of the CCDF at k (always <= 0)
-        """
         return self._digest.dccdf(k)
 
     def lower(self):
-        """Get the minimum value in the distribution.
-        
+        """Get the minimum value in the digest.
+
         Returns:
             int: The smallest value in the digest
         """
         return self._digest.lower()
 
     def upper(self):
-        """Get the maximum value in the distribution.
-        
+        """Get the maximum value in the digest.
+
         Returns:
             int: The largest value in the digest
         """
@@ -477,695 +524,78 @@ class DigestVariable(RandomVariable):
 
     def mean(self):
         return self._digest.mean()
-    
-    def _compile(self, codes, operands):
+
+    def _compile(self, vm=None):
         """Compile the digest into VM bytecode for random sampling.
-        
+
         Converts the t-digest into a histogram representation suitable for
         the virtual machine's random histogram sampling operation. The digest's
-        centroids are transformed into (value, cumulative_probability) pairs
-        that enable efficient inverse transform sampling.
-        
-        The compilation process:
+        centroids and weights are stored in the VM's histogram arrays and
+        referenced by index in the bytecode.
+
+        Steps:
         1. Extracts centroid values and weights from the digest
-        2. Computes interval weights between adjacent centroids
-        3. Builds cumulative probability distribution
-        4. Pushes histogram data onto the VM stack in reverse order
-        5. Emits OP_RAND_HIST instruction
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
+        2. Stores them in the VM's histogram storage
+        3. Emits a RANDHIST opcode referencing the stored histogram
         """
+        if vm is None:
+            vm = VirtualMachine(np.zeros(1, dtype=np.int64), np.zeros(1))
+
         # We convert and compile the digest node into a generic histogram for random
-        # sampling.
-        
+        # sampling in the VM
         x = self._digest.getBins()
         w = self._digest.getWeights()
         n = self._digest.getActiveBinCount()
 
-      
+        vm.histBins.append(x)
+        vm.histWeights.append(w)
+        vm.histN.append(n)
 
-        # Trim possible zeros at the end of the arrays.
-        x = x[:n]
-        w = w[:n]
+        histIdx = vm.histCount
+        vm.histCount += 1
 
-        # print([f'{xx:.1f}' for xx in x])
-        # print([f'{ww:.1f}' for ww in w])          
+        vm.codes    = np.append(vm.codes,    _RANDHIST)
+        vm.operands = np.append(vm.operands, histIdx)
 
-        b = np.zeros(n - 1)
+        return vm
 
 
-        
-        c = np.zeros(n)
+class DigestNode(RandomVariable):
+    """A random variable node that computes its distribution via Monte Carlo simulation.
 
-        for i in range(n - 1):
-            b[i] = (w[i] + w[i+1]) / 2
+    DigestNode wraps another RandomVariable and computes its distribution when
+    the compute() method is called, returning a DigestVariable. This is the
+    primary mechanism for converting an expression tree into a distribution.
 
-        for i in range(n):
-            for j in range(0, i - 1):
-                c[i] = c[i] + b[j]
+    Args:
+        rv (RandomVariable): The expression to evaluate
 
-        c = c / b.sum()
-
-        # print("Bins:")
-
-        # print([f'{bb:.1f}' for bb in b])
-        # print("C:")
-        # print([f'{cc:.5f}' for cc in c])
-        c2 = b.cumsum() / b.sum()        
-        # print([f'{cc:.5f}' for cc in c2])        
-
-        c[1:] = c2
-        c[0]  = 0
-        # print([f'{cc:.5f}' for cc in c])
-        for i in range(n - 1, -1, -1):
-            self._compileOrPush(codes, operands, c[i])
-            self._compileOrPush(codes, operands, x[i])
-
-        codes.append(OP_RAND_HIST)
-        operands.append(n)
-        
-            
-        
-        
-    
-#-----------------------------------------------------------------------------------------
-
-class Constant(RandomVariable):
-    """Represents a constant value in the expression tree.
-    
-    A leaf node that wraps a numeric constant, allowing it to be used
-    in algebraic expressions with other random variables.
-    
-    Example:
-        >>> c = Constant(5)
-        >>> x = Normal(0, 1) + c  # Adds constant 5 to normal distribution
-    """
-    def printTree(self,level=0):
-        """Print the constant value with indentation.
-        
-        Args:
-            level (int, optional): Indentation level. Defaults to 0.
-        """
-        print(' '*level*4+str(self.children[0]))
-
-    def _compile(self, codes, operands):
-        """Compile to PUSH operation for the constant value.
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-        codes.append(OP_PUSH)
-        operands.append(self.children[0])
-
-#-----------------------------------------------------------------------------------------
-
-class RandInt(RandomVariable):
-    """Generates random integers within a specified range.
-    
-    Takes two child nodes representing the lower and upper bounds
-    and generates uniformly distributed random integers in that range.
-    
-    Example:
-        >>> low = Constant(1)
-        >>> high = Constant(10)
-        >>> rand_int = RandInt(low, high)  # Random integer from 1 to 10
-    """
-    def _compile(self, codes, operands):
-        """Compile to random integer generation operation.
-        
-        Compiles children (bounds) then emits RANDINT operation.
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-        self._compileChildren(codes, operands)
-        codes.append(OP_RANDINT)
-        operands.append(0)
-
-#-----------------------------------------------------------------------------------------
-
-class LessThan(RandomVariable):
-    """Implements less-than comparison (<) between two expressions.
-    
-    Returns 1.0 if the first operand is less than the second, 0.0 otherwise.
-    Useful for creating indicator functions and conditional logic.
-    
     Example:
         >>> x = Normal(0, 1)
-        >>> indicator = x < 0  # Creates LessThan node
+        >>> node = DigestNode(x)
+        >>> result = node.compute(samples=10000)
     """
-    def _compile(self, codes, operands):
-        """Compile to less-than comparison operation.
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-        self._compileChildren(codes, operands)
-        codes.append(OP_LT)
-        operands.append(0)
+    def __init__(self, rv):
+        self.rv = rv
 
-#-----------------------------------------------------------------------------------------
+    def compute(self, samples=10000, maxBins=32):
+        """Evaluate the expression tree via Monte Carlo simulation.
 
-class LessThanEqual(RandomVariable):
-    """Implements less-than-or-equal comparison (<=) between two expressions.
-    
-    Returns 1.0 if the first operand is less than or equal to the second, 0.0 otherwise.
-    Useful for creating indicator functions and conditional logic.
-    
-    Example:
-        >>> x = Normal(0, 1)
-        >>> indicator = x <= 0  # Creates LessThanEqual node
-    """
-    def _compile(self, codes, operands):
-        """Compile to less-than-or-equal comparison operation.
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-        self._compileChildren(codes, operands)
-        codes.append(OP_LE)
-        operands.append(0)        
-
-#-----------------------------------------------------------------------------------------
-
-class Add(RandomVariable):
-    """Implements addition between two expressions.
-    
-    Represents the sum of two random variables or expressions.
-    Created automatically when using the + operator.
-    
-    Example:
-        >>> x = Normal(0, 1)
-        >>> y = Normal(5, 2)
-        >>> sum_expr = x + y  # Creates Add node
-    """
-    def _compile(self, codes, operands):
-        """Compile to addition operation.
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-        self._compileChildren(codes, operands)
-        codes.append(OP_ADD)
-        operands.append(0)
-
-#-----------------------------------------------------------------------------------------
-
-class Sub(RandomVariable):
-    """Implements subtraction between two expressions.
-    
-    Represents the difference of two random variables or expressions.
-    Created automatically when using the - operator.
-    
-    Example:
-        >>> x = Normal(5, 1)
-        >>> y = Normal(2, 1)
-        >>> diff_expr = x - y  # Creates Sub node
-    """
-    def _compile(self, codes, operands):
-        """Compile to subtraction operation.
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-        self._compileChildren(codes, operands)
-        codes.append(OP_SUB)
-        operands.append(0)
-
-#-----------------------------------------------------------------------------------------
-
-class Mul(RandomVariable):
-    """Implements multiplication between two expressions.
-    
-    Represents the product of two random variables or expressions.
-    Created automatically when using the * operator.
-    
-    Example:
-        >>> x = Normal(1, 0.1)
-        >>> y = Normal(2, 0.2)
-        >>> product_expr = x * y  # Creates Mul node
-    """
-    def _compile(self, codes, operands):
-        """Compile to multiplication operation.
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-        self._compileChildren(codes, operands)
-        codes.append(OP_MUL)
-        operands.append(0)
-
-#-----------------------------------------------------------------------------------------
-
-class Div(RandomVariable):
-    """Implements division between two expressions.
-    
-    Represents the quotient of two random variables or expressions.
-    Created automatically when using the / operator.
-    
-    Example:
-        >>> x = Normal(10, 1)
-        >>> y = Normal(2, 0.1)
-        >>> ratio_expr = x / y  # Creates Div node
-    """
-    def _compile(self, codes, operands):
-        """Compile to division operation.
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-        self._compileChildren(codes, operands)
-        codes.append(OP_DIV)
-        operands.append(0)
-
-#-----------------------------------------------------------------------------------------
-
-class FloorDiv(RandomVariable):
-    """Implements floor division between two expressions.
-    
-    Represents the floor of the quotient of two random variables or expressions.
-    Created automatically when using the // operator.
-    
-    Example:
-        >>> x = Normal(10, 1)
-        >>> y = Normal(3, 0.1)
-        >>> floor_div_expr = x // y  # Creates FloorDiv node
-    """
-    def _compile(self, codes, operands):
-        """Compile to floor division operation.
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-        self._compileChildren(codes, operands)
-        codes.append(OP_FLOORDIV)
-        operands.append(0)
-
-#-----------------------------------------------------------------------------------------
-
-class Mod(RandomVariable):
-    """Implements modulo operation between two expressions.
-    
-    Represents the remainder of division between two random variables or expressions.
-    Created automatically when using the % operator.
-    
-    Example:
-        >>> x = RandInt(1, 100)
-        >>> remainder = x % 7  # Creates Mod node
-    """
-    def _compile(self, codes, operands):
-        """Compile to modulo operation.
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-        self._compileChildren(codes, operands)
-        codes.append(OP_MOD)
-        operands.append(0)
-
-#-----------------------------------------------------------------------------------------
-
-class Pow(RandomVariable):
-    """Implements exponentiation between two expressions.
-    
-    Represents one expression raised to the power of another.
-    Created automatically when using the ** operator.
-    
-    Example:
-        >>> x = Normal(2, 0.1)
-        >>> power_expr = x ** 2  # Creates Pow node for x squared
-    """
-    def _compile(self, codes, operands):
-        """Compile to exponentiation operation.
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-        self._compileChildren(codes, operands)
-        codes.append(OP_POW)
-        operands.append(0)
-
-#-----------------------------------------------------------------------------------------
-
-class Max(RandomVariable):
-    def _compile(self, codes, operands):
-        self._compileChildren(codes, operands)
-        codes.append(OP_MAX)
-        operands.append(0)
-
-class Min(RandomVariable):
-    def _compile(self, codes, operands):
-        self._compileChildren(codes, operands)
-        codes.append(OP_MIN)
-        operands.append(0)          
-
-#-----------------------------------------------------------------------------------------
-
-class Normal(RandomVariable):
-    """Represents a normal (Gaussian) distribution.
-
-    Generates random samples from a normal distribution with specified
-    mean and standard deviation parameters.
-
-    Attributes:
-        mean: Mean of the distribution (default: 0)
-        stdev: Standard deviation of the distribution (default: 1)
-
-    Example:
-        >>> x = Normal(0, 1)      # Standard normal
-        >>> y = Normal(10, 2.5)   # Normal with mean=10, std=2.5
-    """
-    def __init__(self, mean=0, stdev=1):
-        """Initialize normal distribution with mean and standard deviation.
+        Compiles the expression tree into VM bytecode and runs it for the
+        specified number of samples, collecting results into a t-digest.
 
         Args:
-            mean (float, optional): Mean of the distribution. Defaults to 0.
-            stdev (float, optional): Standard deviation. Defaults to 1.
+            samples (int, optional): Number of Monte Carlo samples. Defaults to 10000.
+            maxBins (int, optional): Maximum bins for the t-digest. Defaults to 32.
+
+        Returns:
+            DigestVariable: A wrapper around the t-digest containing the
+                           simulated distribution
         """
-        self.mean = mean
-        self.stdev = stdev
+        vm     = self.rv._compile()
+        vm     = vm
+        digest =  vm.compute(samples=samples, maxBins=maxBins)
+        return DigestVariable(digest)
 
-    def _compile(self, codes, operands):
-        """Compile to normal distribution sampling operation.
-
-        Pushes mean and standard deviation onto the stack, then emits
-        the RANDNORM operation for sampling.
-
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-        self._compileOrPush(codes, operands, self.mean)
-        self._compileOrPush(codes, operands, self.stdev)
-        # self._compileChildren(codes, operands)
-        codes.append(OP_RANDNORM)
-        operands.append(0)
-
-#-----------------------------------------------------------------------------------------
-
-class NegativeBinomial(RandomVariable):
-    """Represents a negative binomial distribution.
-
-    Generates random samples from a negative binomial distribution. Can be
-    parameterized either by (n, p) or by (mean, dispersion).
-
-    The negative binomial distribution models the number of failures before
-    achieving n successes, where each trial has probability p of success.
-    It is commonly used in count data modeling, especially when overdispersion
-    is present (variance > mean).
-
-    Parameterization options:
-    1. Direct (n, p): n is number of successes, p is probability of success
-    2. Mean-dispersion: mean and dispersion (alpha) where var = mean + alpha * mean^2
-
-    Attributes:
-        n: Number of successes (shape parameter)
-        p: Probability of success in each trial
-
-    Example:
-        >>> x = NegativeBinomial(n=5, p=0.5)  # Direct parameterization
-        >>> y = NegativeBinomial(mean=10, dispersion=0.5)  # Mean-dispersion form
-    """
-    def __init__(self, mean=None, dispersion=None, n=None, p=None):
-        """Initialize negative binomial distribution.
-
-        Either (n, p) or (mean, dispersion) must be provided.
-
-        Args:
-            mean (float, optional): Mean of the distribution.
-            dispersion (float, optional): Dispersion parameter (alpha).
-                Variance = mean + dispersion * mean^2
-            n (float, optional): Number of successes (shape parameter).
-            p (float, optional): Probability of success in each trial.
-        """
-        if mean is not None and dispersion is not None:
-            # Convert mean-dispersion parameterization to n, p
-            var = mean + dispersion * mean ** 2
-            self.p = mean / var
-            self.n = mean ** 2 / (var - mean)
-        elif n is not None and p is not None:
-            self.n = n
-            self.p = p
-        else:
-            raise ValueError("Either (mean, dispersion) or (n, p) must be provided")
-
-    def __repr__(self):
-        return f'<NegativeBinomial(p={self.p}, n={self.n})>'
-
-    def _compile(self, codes, operands):
-        """Compile to negative binomial distribution sampling operation.
-
-        Pushes n and p onto the stack, then emits the RAND_NEGBINOM
-        operation for sampling.
-
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-        self._compileOrPush(codes, operands, self.n)
-        self._compileOrPush(codes, operands, self.p)
-        codes.append(OP_RAND_NEGBINOM)
-        operands.append(0)
-
-#-----------------------------------------------------------------------------------------
-
-class Gamma(RandomVariable):
-    """Represents a shifted gamma distribution.
-
-    Generates random samples from a gamma distribution parameterised by shape,
-    scale, and location. The location shifts the distribution to the right so
-    the minimum value is location rather than zero.
-
-    Attributes:
-        shape: Shape parameter (k > 0)
-        scale: Scale parameter (θ > 0)
-        location: Left shift / minimum value of the distribution (default: 0)
-
-    Example:
-        >>> x = Gamma(shape=2, scale=3)         # Gamma(2, 3) starting at 0
-        >>> y = Gamma(shape=2, scale=3, location=5)  # Same but shifted to start at 5
-    """
-    def __init__(self, shape, scale, location=0):
-        """Initialize shifted gamma distribution.
-
-        Args:
-            shape (float): Shape parameter (k > 0).
-            scale (float): Scale parameter (θ > 0).
-            location (float, optional): Location shift. Defaults to 0.
-        """
-        self.shape = shape
-        self.scale = scale
-        self.location = location
-
-    def _compile(self, codes, operands):
-        self._compileOrPush(codes, operands, self.shape)
-        self._compileOrPush(codes, operands, self.scale)
-        self._compileOrPush(codes, operands, self.location)
-        codes.append(OP_RAND_GAMMA)
-        operands.append(0)
-
-#-----------------------------------------------------------------------------------------
-
-class Pert(RandomVariable):
-    """Represents a PERT distribution.
-
-    Generates random samples from a PERT (Program Evaluation and Review Technique)
-    distribution parameterised by minimum, most-likely (mode), and maximum values.
-    The distribution is a scaled Beta distribution whose shape parameters are derived
-    from the three-point estimate.
-
-    The mean of the distribution is (low + 4*mode + high) / 6.
-
-    Attributes:
-        low: Minimum value of the distribution
-        mode: Most-likely value (peak of the distribution)
-        high: Maximum value of the distribution
-
-    Example:
-        >>> x = Pert(low=1, mode=5, high=10)  # PERT with min=1, mode=5, max=10
-        >>> y = Pert(0, 50, 100)              # Symmetric PERT centred at 50
-    """
-    def __init__(self, low, mode, high):
-        """Initialize PERT distribution.
-
-        Args:
-            low (float): Minimum value (lower bound).
-            mode (float): Most-likely value; must satisfy low <= mode <= high.
-            high (float): Maximum value (upper bound).
-        """
-        self.low = low
-        self.mode = mode
-        self.high = high
-
-    def _compile(self, codes, operands):
-        self._compileOrPush(codes, operands, self.low)
-        self._compileOrPush(codes, operands, self.mode)
-        self._compileOrPush(codes, operands, self.high)
-        codes.append(OP_RAND_PERT)
-        operands.append(0)
-
-#-----------------------------------------------------------------------------------------
-
-class Summation(RandomVariable):
-    """
-    Represents a mathematical summation (Σ) operation.
-    
-    Implements a loop-based summation where a term expression is evaluated
-    multiple times and the results are accumulated. This is useful for modeling
-    scenarios like portfolio values, aggregate risks, or any situation requiring
-    the sum of multiple random outcomes.
-    
-    Attributes:
-        nTerms: Number of iterations/terms to sum
-        term: Expression to evaluate and sum for each iteration
-        
-    Example:
-        >>> die = RandInt(1, 6)
-        >>> sum_of_dice = Summation(10, die)  # Sum of 10 dice rolls
-        >>> # Equivalent to: die + die + ... (10 times)
-    """
-    def __init__(self, nTerms=1, term=0):
-        """Initialize summation with number of terms and expression.
-        
-        Args:
-            nTerms (int or RandomVariable, optional): Number of terms to sum. Defaults to 1.
-            term (RandomVariable or numeric, optional): Expression to sum. Defaults to 0.
-        """
-        self.nTerms = nTerms
-        self.term   = term
-    def _compile(self, codes, operands):
-        """Compile to summation loop operations.
-        
-        Generates bytecode for a summation loop:
-        1. Pushes number of terms
-        2. Emits SUM_START to initialize loop
-        3. Compiles the term expression (evaluated each iteration)
-        4. Emits SUM_END to accumulate and loop
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-
-        # Compile nTerms.
-        if hasattr(self.nTerms, '_compile'):
-            self.nTerms._compile(codes, operands)
-        else:
-            codes.append(OP_PUSH)
-            operands.append(self.nTerms)
-
-        codes.append(OP_SUM_START)
-        operands.append(0)
-
-        if hasattr(self.term, '_compile'):
-            self.term._compile(codes, operands)
-        else:
-            codes.append(OP_PUSH)
-            operands.append(self.term)
-
-        codes.append(OP_SUM_END)
-        operands.append(0)
-
-#-----------------------------------------------------------------------------------------
-
-class Quantiles(RandomVariable):
-    """
-    Samples from a distribution defined by equally spaced quantile values.
-    
-    Takes a series of quantile values and creates a distribution that can be
-    sampled using linear interpolation between the quantiles. This is useful
-    for modeling distributions based on expert knowledge or historical data
-    points.
-    
-    The quantiles should represent equally spaced probability levels
-    (e.g., 0%, 25%, 50%, 75%, 100% quantiles).
-    
-    Example:
-        >>> # Define distribution by 5 quantiles
-        >>> dist = Quantiles(10, 20, 30, 40, 50)
-        >>> # Samples between these values with linear interpolation
-    """
-    def __init__(self, *args):
-        """Initialize with quantile values.
-        
-        Args:
-            *args: Variable number of quantile values in ascending order
-        """
-        self.children = list(reversed(args))
-
-    def _compile(self, codes, operands):
-        """Compile to quantile sampling operation.
-        
-        Pushes all quantile values onto the stack and emits the
-        RAND_QUANTILES operation for interpolated sampling.
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-        self._compileChildren(codes, operands)
-        codes.append(OP_RAND_QUANTILES)
-        operands.append(len(self.children))
-
-
-#-----------------------------------------------------------------------------------------
-        
-class ArraySum(RandomVariable):
-    """
-    Sums a contiguous subset of an array of random variables.
-    
-    Takes an array of expressions and sums only those within a specified
-    range [start, end). This is useful for modeling partial sums, such as
-    summing only profitable investments from a portfolio or selecting
-    a subset of outcomes.
-    
-    Attributes:
-        children: List of expressions (in reverse order for stack operations)
-        start: Starting index of the range to sum
-        end: Ending index of the range to sum (exclusive)
-        
-    Example:
-        >>> portfolio = [Normal(100, 10) for _ in range(20)]  # 20 investments
-        >>> partial_sum = ArraySum(portfolio, 5, 15)  # Sum investments 5-14
-    """
-    def __init__(self, array, start, end):
-        """Initialize with array and range specification.
-        
-        Args:
-            array (list): List of RandomVariable expressions
-            start (int or RandomVariable): Starting index (inclusive)
-            end (int or RandomVariable): Ending index (exclusive)
-        """
-        self.children = list(reversed(array))
-        self.start = start
-        self.end = end
-
-    def _compile(self, codes, operands):
-        """Compile to array summation operation.
-        
-        Pushes all array elements, then start and end indices,
-        and emits the ARRAY_SUM operation.
-        
-        Args:
-            codes (list): List to append operation codes to
-            operands (list): List to append operands to
-        """
-        self._compileChildren(codes, operands)
-        self._compileOrPush(codes, operands, self.end)
-        self._compileOrPush(codes, operands, self.start)
-
-        codes.append(OP_ARRAY_SUM)
-        operands.append(len(self.children))
+    def _compile(self, vm=None):
+        return self.rv._compile(vm)
