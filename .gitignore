@@ -18,6 +18,7 @@ casino/core.c
 casino.egg-info/*
 casino/*.c
 ranvar/*.c
+ranvar/*.cpp
 ranvar.egg-info/*
 output.csv
 docs/old/*
