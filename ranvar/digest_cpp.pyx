@@ -1,6 +1,5 @@
 # cython: language_level=3
 # distutils: language = c++
-# distutils: sources = ranvar/cpp/digest.cpp
 # distutils: include_dirs = ranvar/cpp
 
 import numpy as np
