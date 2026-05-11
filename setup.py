@@ -39,6 +39,13 @@ extensions = [
     Extension("ranvar.random", ["ranvar/random.py"]),
     Extension("ranvar.vm", ["ranvar/vm.py"]),
     Extension("ranvar.digest", ["ranvar/digest.py"], include_dirs=[np.get_include()]),
+    Extension(
+        "ranvar.digest_cpp",
+        sources=["ranvar/digest_cpp.pyx", "ranvar/cpp/digest.cpp"],
+        include_dirs=[np.get_include(), "ranvar/cpp"],
+        language="c++",
+        extra_compile_args=["-std=c++17"],
+    ),
 ]
 
 setup(
