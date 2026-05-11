@@ -979,6 +979,46 @@ class Gamma(RandomVariable):
 
 #-----------------------------------------------------------------------------------------
 
+class Pert(RandomVariable):
+    """Represents a PERT distribution.
+
+    Generates random samples from a PERT (Program Evaluation and Review Technique)
+    distribution parameterised by minimum, most-likely (mode), and maximum values.
+    The distribution is a scaled Beta distribution whose shape parameters are derived
+    from the three-point estimate.
+
+    The mean of the distribution is (low + 4*mode + high) / 6.
+
+    Attributes:
+        low: Minimum value of the distribution
+        mode: Most-likely value (peak of the distribution)
+        high: Maximum value of the distribution
+
+    Example:
+        >>> x = Pert(low=1, mode=5, high=10)  # PERT with min=1, mode=5, max=10
+        >>> y = Pert(0, 50, 100)              # Symmetric PERT centred at 50
+    """
+    def __init__(self, low, mode, high):
+        """Initialize PERT distribution.
+
+        Args:
+            low (float): Minimum value (lower bound).
+            mode (float): Most-likely value; must satisfy low <= mode <= high.
+            high (float): Maximum value (upper bound).
+        """
+        self.low = low
+        self.mode = mode
+        self.high = high
+
+    def _compile(self, codes, operands):
+        self._compileOrPush(codes, operands, self.low)
+        self._compileOrPush(codes, operands, self.mode)
+        self._compileOrPush(codes, operands, self.high)
+        codes.append(OP_RAND_PERT)
+        operands.append(0)
+
+#-----------------------------------------------------------------------------------------
+
 class Summation(RandomVariable):
     """
     Represents a mathematical summation (Σ) operation.
