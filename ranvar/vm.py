@@ -110,16 +110,6 @@ class VirtualMachine():
     iterCount: pyx.int
     iterators: np.ndarray
     def __init__(self, codes, operands) -> None:
-        """
-        Initialize the virtual machine with program code and operands.
-
-        Args:
-            codes (np.ndarray): Array of operation codes defining the program
-            operands (np.ndarray): Array of operands for each operation
-
-        Note:
-            The codes and operands arrays must have the same length.
-        """
         self.codes    = codes
         self.operands = operands
         self.stack    = np.zeros(100)
@@ -149,21 +139,10 @@ class VirtualMachine():
     @pyx.wraparound(False)
     @pyx.cdivision(True)
     def _reset(self) -> pyx.void:
-        """
-        Reset the virtual machine state for a new execution.
-
-        Clears all stacks, resets counters, and reinitializes memory arrays.
-        This allows the same VM instance to be used for multiple executions.
-        """
         self.stackCount   = 0
         self.iterCount    = 0
         self.pointerCount = 0
         self.counter      = 0
-
-        # self.stack    = np.zeros(100)
-        # self.variables = np.zeros(26)
-        # self.pointers = np.zeros(16, dtype=np.int_)
-        # self.iterators = np.zeros(16)
 
         i: pyx.int
         for i in range(100):
@@ -183,15 +162,6 @@ class VirtualMachine():
     @pyx.boundscheck(False)
     @pyx.wraparound(False)
     def pushPointer(self, value: pyx.int) -> pyx.void:
-        """
-        Push a pointer (return address) onto the pointer stack.
-
-        Used for implementing loop constructs by storing the instruction
-        address to return to after loop completion.
-
-        Args:
-            value (int): The instruction pointer value to store
-        """
         self._pointers[self.pointerCount] = value
         self.pointerCount += 1
 
@@ -200,15 +170,6 @@ class VirtualMachine():
     @pyx.boundscheck(False)
     @pyx.wraparound(False)
     def popPointer(self) -> pyx.int:
-        """
-        Pop a pointer (return address) from the pointer stack.
-
-        Returns:
-            int: The most recently pushed pointer value
-
-        Raises:
-            AssertionError: If the pointer stack is empty
-        """
         assert self.pointerCount > 0
         self.pointerCount -= 1
         return self._pointers[self.pointerCount]
@@ -218,15 +179,6 @@ class VirtualMachine():
     @pyx.boundscheck(False)
     @pyx.wraparound(False)
     def pushIterator(self, value: pyx.double) -> pyx.void:
-        """
-        Push an iterator count onto the iterator stack.
-
-        Used for implementing loop constructs by tracking remaining
-        iterations for nested loops.
-
-        Args:
-            value (float): The iteration count to store
-        """
         self._iterators[self.iterCount] = value
         self.iterCount += 1
 
@@ -235,466 +187,315 @@ class VirtualMachine():
     @pyx.boundscheck(False)
     @pyx.wraparound(False)
     def popIterator(self) -> pyx.double:
-        """
-        Pop an iterator count from the iterator stack.
-
-        Returns:
-            float: The most recently pushed iterator value
-
-        Raises:
-            AssertionError: If the iterator stack is empty
-        """
         assert self.iterCount > 0
         self.iterCount -= 1
         return self._iterators[self.iterCount]
 
-
-    @pyx.ccall
+    @pyx.cfunc
     @pyx.initializedcheck(False)
     @pyx.boundscheck(False)
     @pyx.wraparound(False)
-    def pushStack(self, value: pyx.double) -> pyx.void:
-        """
-        Push a value onto the execution stack.
+    def peekIterator(self) -> pyx.double:
+        return self._iterators[self.iterCount - 1]
 
-        Args:
-            value (float): The value to push onto the stack
-        """
+    @pyx.cfunc
+    @pyx.initializedcheck(False)
+    @pyx.boundscheck(False)
+    @pyx.wraparound(False)
+    def peekPointer(self) -> pyx.int:
+        return self._pointers[self.pointerCount - 1]
+
+    @pyx.cfunc
+    @pyx.initializedcheck(False)
+    @pyx.boundscheck(False)
+    @pyx.wraparound(False)
+    def pushStack(self, value: pyx.double):
         self._stack[self.stackCount] = value
         self.stackCount += 1
 
-    @pyx.ccall
+    @pyx.cfunc
     @pyx.initializedcheck(False)
     @pyx.boundscheck(False)
     @pyx.wraparound(False)
-    def popStack(self) -> pyx.double:
-        """
-        Pop a value from the execution stack.
-
-        Returns:
-            float: The top value on the stack
-
-        Raises:
-            AssertionError: If the stack is empty
-        """
-        assert self.stackCount > 0
+    def popStack(self) -> pyx.float:
+        # assert self.stackCount > 0
         self.stackCount -= 1
         return self._stack[self.stackCount]
 
+    @pyx.cfunc
+    def _dropStack(self, cnt:pyx.int = 1):
+        i: pyx.int
+        for i in range(cnt):
+            self.popStack()
 
     @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    def _add(self) -> pyx.void:
+    def _store(self, varNumber: pyx.double) -> pyx.void:
+        idx: pyx.int = pyx.cast(pyx.int, varNumber)
+        varValue = self.popStack()
+        self._variables[idx] = varValue
+
+    @pyx.cfunc
+    def _load(self, varNumber: pyx.double) -> pyx.void:
+        idx: pyx.int = pyx.cast(pyx.int, varNumber)
+        self.pushStack(self._variables[idx])
+
+    @pyx.cfunc
+    def _sumStart(self, loopNumber: pyx.double) -> pyx.void:
+        idx: pyx.int = pyx.cast(pyx.int, loopNumber)
+        nTerms = self.popStack()
+        self.pushStack(0)
+        self.pushIterator(nTerms)
+        self.pushPointer(self.counter)
+
+    @pyx.cfunc
+    def _sumEnd(self, loopNumber: pyx.double) -> pyx.void:
+        idx: pyx.int = pyx.cast(pyx.int, loopNumber)
+
+        # First we add the running total to the answer.
         x1 = self.popStack()
         x2 = self.popStack()
         self.pushStack(x1 + x2)
+        self.pushIterator(self.popIterator() - 1)
 
-    @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    def _sub(self) -> pyx.void:
-        x1 = self.popStack()
-        x2 = self.popStack()
-        self.pushStack(x2 - x1)
+        if self.peekIterator() > 0:
+            self.counter = self.peekPointer()
 
-    @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    def _mul(self) -> pyx.void:
-        x1 = self.popStack()
-        x2 = self.popStack()
-        self.pushStack(x1 * x2)
-
-    @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    def _div(self) -> pyx.void:
-        x1 = self.popStack()
-        x2 = self.popStack()
-        self.pushStack(x2 / x1)
-
-    @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    def _mod(self) -> pyx.void:
-        x1 = self.popStack()
-        x2 = self.popStack()
-        self.pushStack(x2 % x1)
-
-    @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    @pyx.cdivision(True)
-    def _floordiv(self) -> pyx.void:
-        x1 = self.popStack()
-        x2 = self.popStack()
-        self.pushStack(pyx.cast(pyx.double, pyx.cast(pyx.long, x2) // pyx.cast(pyx.long, x1)))
-
-    @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    def _pow(self) -> pyx.void:
-        x1 = self.popStack()
-        x2 = self.popStack()
-        self.pushStack(x2 ** x1)
-
-    @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    def _neg(self) -> pyx.void:
-        x1 = self.popStack()
-        self.pushStack(-x1)
-
-    @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    def _abs(self) -> pyx.void:
-        x1 = self.popStack()
-        if x1 < 0:
-            self.pushStack(-x1)
         else:
-            self.pushStack(x1)
+            self.popPointer()
+            self.popIterator()
+
+
 
     @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    def _lt(self) -> pyx.void:
-        x1 = self.popStack()
+    def _binop(self, opCode: pyx.double) -> pyx.void:
         x2 = self.popStack()
-        if x2 < x1:
-            self.pushStack(1.0)
-        else:
-            self.pushStack(0.0)
-
-    @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    def _le(self) -> pyx.void:
         x1 = self.popStack()
-        x2 = self.popStack()
-        if x2 <= x1:
-            self.pushStack(1.0)
-        else:
-            self.pushStack(0.0)
+        if opCode == _ADD:
+            self.pushStack(x1 + x2)
+        elif opCode == _MUL:
+            self.pushStack(x1 * x2)
+        elif opCode == _POW:
+            self.pushStack(x1 ** x2)
+        elif opCode == _DIV:
+            self.pushStack(x1 / x2)
+        elif opCode == _FLOORDIV:
+            self.pushStack(x1 // x2)
+        elif opCode == _MOD:
+            self.pushStack(x1 % x2)
+        elif opCode == _SUB:
+            self.pushStack(x1 - x2)
+        elif opCode == _LT:
+            self.pushStack(1) if x1 < x2 else self.pushStack(0)
+        elif opCode == _LE:
+            self.pushStack(1) if x1 <= x2 else self.pushStack(0)
+        elif opCode == _MAX:
+            self.pushStack(x1) if x1 > x2 else self.pushStack(x2)
+        elif opCode == _MIN:
+            self.pushStack(x1) if x1 < x2 else self.pushStack(x2)
 
     @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    def _max(self) -> pyx.void:
-        x1 = self.popStack()
-        x2 = self.popStack()
-        if x1 > x2:
-            self.pushStack(x1)
-        else:
-            self.pushStack(x2)
-
-    @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    def _min(self) -> pyx.void:
-        x1 = self.popStack()
-        x2 = self.popStack()
-        if x1 < x2:
-            self.pushStack(x1)
-        else:
-            self.pushStack(x2)
-
-    @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    @pyx.cdivision(True)
     def _randInt(self) -> pyx.void:
         h = self.popStack()
         l = self.popStack()
-        self.pushStack(pyx.cast(pyx.double, randint(l, h)))
+
+        self.pushStack(randint(l, h))
 
     @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
     def _randNorm(self) -> pyx.void:
-        stdev = self.popStack()
-        mu    = self.popStack()
-        self.pushStack(randnorm(mu, stdev))
+        std: pyx.double = self.popStack()
+        mu: pyx.double    = self.popStack()
+
+        self.pushStack(randnorm(mu, std))
 
     @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    def _randExp(self) -> pyx.void:
-        lam = self.popStack()
-        self.pushStack(randexp(lam))
-
-    @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    def _randGamma(self) -> pyx.void:
-        loc   = self.popStack()
-        theta = self.popStack()
-        k     = self.popStack()
-        self.pushStack(randgamma(k, theta) + loc)
-
-    @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    def _randPoisson(self) -> pyx.void:
-        lam = self.popStack()
-        self.pushStack(pyx.cast(pyx.double, randpoisson(lam)))
-
-    @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
     def _randNegBinom(self) -> pyx.void:
-        p = self.popStack()
-        r = self.popStack()
-        self.pushStack(pyx.cast(pyx.double, randnegbinom(r, p)))
+        p: pyx.double = self.popStack()
+        n: pyx.double = self.popStack()
+
+        self.pushStack(randnegbinom(n, p))
 
     @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
+    def _randGamma(self) -> pyx.void:
+        location: pyx.double = self.popStack()
+        scale: pyx.double = self.popStack()
+        shape: pyx.double = self.popStack()
+
+        self.pushStack(randgamma(shape, scale) + location)
+
+    @pyx.cfunc
     def _randPert(self) -> pyx.void:
-        lam  = self.popStack()
-        high = self.popStack()
-        mode = self.popStack()
-        low  = self.popStack()
+        high: pyx.double = self.popStack()
+        mode: pyx.double = self.popStack()
+        low:  pyx.double = self.popStack()
+
         self.pushStack(randpert(low, mode, high))
 
     @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    @pyx.cdivision(True)
-    def _randQuantiles(self, n: pyx.int) -> pyx.void:
-        """
-        Sample a random value from a quantile distribution stored in operands.
-
-        This method implements inverse transform sampling using quantiles
-        stored in the operands array. It generates a uniform random number
-        and maps it to the corresponding quantile value through linear
-        interpolation.
-
-        Args:
-            n (int): The number of quantile values in the distribution
-        """
-        u: pyx.double = rand()
-        N: pyx.int = n
-
-        # i == index of operands we're on right now.
-        i: pyx.int = self.counter + 1
-
-        # the index * (N-1) at the bounds [0, N-1] is a float telling us our position in the
-        # quantile array.
-        # At the lower bound (u==0), we want index 0.
-        # At the upper bound (u==1), we want index N-1.
-        fl_index: pyx.double = u * (N - 1)
-
-        # Lower and upper bounds of interval
-        idx_low: pyx.int  = pyx.cast(pyx.int, c_floor(fl_index))
-        idx_high: pyx.int = idx_low + 1
-
-        # Avoid out of bound access when u==1
-        if idx_high > N-1:
-            idx_high = N-1
-
-        # The fraction tells us how far between the two bounds we are
-        frac: pyx.double = fl_index - pyx.cast(pyx.double, idx_low)
-
-        # Interpolate the result
-        val_low  = self._operands[i + idx_low]
-        val_high = self._operands[i + idx_high]
-
-        result: pyx.double = val_low + frac * (val_high - val_low)
-
-        # Advance the instruction pointer past the data block
-        self.counter += N
-
-        self.pushStack(result)
-
-    @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    @pyx.cdivision(True)
-    def _randHist(self, n: pyx.int) -> pyx.void:
-        """
-        Sample a random value from a histogram distribution stored in operands.
-
-        Uses inverse CDF sampling with a piecewise uniform distribution defined
-        by the histogram bins and weights stored in the operands array.
-
-        The histogram data is stored as interleaved (bin, weight) pairs in the
-        operands array, with n pairs total.
-
-        Args:
-            n (int): The number of bins in the histogram
-        """
-        u: pyx.double = rand()
-        N: pyx.int = n
-
-        # i == base index in operands for this histogram
-        base: pyx.int = self.counter + 1
-
-        # Calculate total weight
-        total_weight: pyx.double = 0.0
-        j: pyx.int
-        for j in range(N):
-            total_weight += self._operands[base + j*2 + 1]
-
-        # Find the bin
-        cumulative: pyx.double = 0.0
-        threshold: pyx.double  = u * total_weight
-        result: pyx.double = self._operands[base]  # default to first bin
-
-        for j in range(N):
-            cumulative += self._operands[base + j*2 + 1]
-            if cumulative >= threshold:
-                result = self._operands[base + j*2]
-                break
-
-        # Advance past histogram data (N bins * 2 doubles each)
-        self.counter += N * 2
-
-        self.pushStack(result)
-
-
-    @pyx.cfunc
-    @pyx.initializedcheck(False)
-    @pyx.boundscheck(False)
-    @pyx.wraparound(False)
-    @pyx.cdivision(True)
-    def _arraySum(self, n: pyx.int) -> pyx.void:
-        """
-        Pop n values from the stack and push their sum.
-
-        Args:
-            n (int): The number of values to sum
-        """
-        result: pyx.double = 0.0
+    def _arraySum(self, nArray: pyx.double) -> pyx.void:
+        som: pyx.double = 0.0
         i: pyx.int
-        for i in range(n):
-            result += self.popStack()
-        self.pushStack(result)
+        nArrayInt: pyx.int = pyx.cast(pyx.int, nArray)
+
+        start: pyx.double = self.popStack()
+        end:pyx.double    = self.popStack()
+
+        for i in range(nArrayInt):
+            x: pyx.double = self.popStack()
+            if (start <= i) and (i < end):
+                som += x
+
+        self.pushStack(som)
+
+    @pyx.cfunc
+    def _randQuantiles(self, nBins: pyx.double) -> pyx.void:
+        dY: pyx.double = 1. / (nBins - 1)
+        y_: pyx.double = rand()
+
+        i: pyx.double = c_floor(y_ / dY)
+
+        self._dropStack(pyx.cast(pyx.int, i))
+
+        xi:pyx.double = self.popStack()
+        xi_n:pyx.double = self.popStack()
+
+        yi:pyx.double   = i*dY
+        yi_n:pyx.double = yi + dY
+
+        self._dropStack(pyx.cast(pyx.int, nBins - i - 2))
+
+        m:pyx.double = (xi_n - xi) / (yi_n - yi)
+
+        x_:pyx.double = xi + m*(y_ - yi)
+
+        self.pushStack(x_)
+
+
+    @pyx.cfunc
+    @pyx.initializedcheck(False)
+    @pyx.boundscheck(False)
+    @pyx.wraparound(False)
+    @pyx.cdivision(True)
+    @pyx.linetrace(True)
+    def _randHist(self, nBins: pyx.double) -> pyx.void:
+        p:    pyx.double
+        xi:   pyx.double
+        ci:   pyx.double
+        xi_n: pyx.double
+        ci_n: pyx.double
+        m:    pyx.double
+        x_:   pyx.double
+        i_n:  pyx.int
+        nB:   pyx.int
+
+        nB = pyx.cast(pyx.int, nBins)
+
+        p = rand()
+
+        xi = self.popStack()
+        ci = self.popStack()
+
+        x_ = 0
+
+        for i_n in range(1, nB):
+            xi_n = self.popStack()
+            ci_n = self.popStack()
+
+            if ci <= p < ci_n:
+                m  = (xi_n - xi) / (ci_n - ci)
+                x_ = xi + m*(p - ci)
+
+            elif (i_n == nBins-1) and (p == 1):
+                x_ = xi_n
+
+            xi = xi_n
+            ci = ci_n
+
+
+        self.pushStack(x_)
+
+
+
+
+
+    def printState(self):
+        _stack = []
+        for i in reversed(range(self.stackCount)):
+            _stack.append(self.stack[i])
+
+        _stack = " ".join([f'{s:.0f}' for s in _stack ])
+
+        print(f'{self.counter}: {self._codes[self.counter]:.0f}     {self._operands[self.counter]} -> [{_stack}]    {self.pointers[:2]}')
+
+
+
 
 
     @pyx.ccall
     @pyx.initializedcheck(False)
     @pyx.boundscheck(False)
     @pyx.wraparound(False)
-    @pyx.cdivision(True)
-    def sample(self) -> pyx.double:
-        """
-        Execute the VM program once and return the result.
+    def sample(self) -> pyx.float:
+        """Execute the loaded program and return the final result.
 
-        Runs the compiled bytecode from start to finish, using any random
-        sampling instructions to draw a single sample from the distribution.
+        Runs the virtual machine by executing all instructions in sequence.
+        The program should leave exactly one value on the stack, which is
+        returned as the result.
 
         Returns:
-            float: The result of executing the VM program once.
+            float: The final value from the execution stack
+
+        Note:
+            The VM state (stack, variables, counters) is modified during
+            execution. Call reset() before sample() for clean execution.
         """
-        N: pyx.int = self._codes.shape[0]
+
+        N:pyx.int = self._codes.shape[0]
         opCode: pyx.double
-        n: pyx.int
+        operand: pyx.double
 
         while self.counter < N:
             opCode = self._codes[self.counter]
+            operand = self._operands[self.counter]
 
             if   opCode == _PASS:
                 pass
             elif opCode == _PUSH:
                 self.pushStack(self._operands[self.counter])
-            elif opCode == _DROP:
-                self.popStack()
             elif opCode == _STORE:
-                slot = pyx.cast(pyx.int, self._operands[self.counter])
-                self._variables[slot] = self.popStack()
+                self._store(self._operands[self.counter])
             elif opCode == _LOAD:
-                slot = pyx.cast(pyx.int, self._operands[self.counter])
-                self.pushStack(self._variables[slot])
-            elif opCode == _NEG:
-                self._neg()
-            elif opCode == _ABS:
-                self._abs()
-            elif opCode == _ADD:
-                self._add()
-            elif opCode == _SUB:
-                self._sub()
-            elif opCode == _MUL:
-                self._mul()
-            elif opCode == _DIV:
-                self._div()
-            elif opCode == _MOD:
-                self._mod()
-            elif opCode == _FLOORDIV:
-                self._floordiv()
-            elif opCode == _POW:
-                self._pow()
-            elif opCode == _LT:
-                self._lt()
-            elif opCode == _LE:
-                self._le()
-            elif opCode == _MAX:
-                self._max()
-            elif opCode == _MIN:
-                self._min()
+                self._load(self._operands[self.counter])
+            elif opCode == _SUM_START:
+                self._sumStart(self._operands[self.counter])
+            elif opCode == _SUM_END:
+                self._sumEnd(self._operands[self.counter])
+            elif _ADD <= opCode <= _BINOPMAX:
+                self._binop(opCode)
+
             elif opCode == _RANDINT:
                 self._randInt()
             elif opCode == _RANDNORM:
                 self._randNorm()
+            elif opCode == _RAND_QUANTILES:
+                self._randQuantiles(operand)
+            elif opCode == _ARRAY_SUM:
+                self._arraySum(operand)
+            elif opCode == _RAND_HIST:
+                self._randHist(operand)
             elif opCode == _RAND_NEGBINOM:
                 self._randNegBinom()
             elif opCode == _RAND_GAMMA:
                 self._randGamma()
             elif opCode == _RAND_PERT:
                 self._randPert()
-            elif opCode == _RAND_QUANTILES:
-                n = pyx.cast(pyx.int, self._operands[self.counter])
-                self._randQuantiles(n)
-            elif opCode == _RAND_HIST:
-                n = pyx.cast(pyx.int, self._operands[self.counter])
-                self._randHist(n)
-            elif opCode == _ARRAY_SUM:
-                n = pyx.cast(pyx.int, self._operands[self.counter])
-                self._arraySum(n)
-            elif opCode == _SUM_START:
-                self.pushIterator(self._operands[self.counter])
-                self.pushPointer(self.counter)
-            elif opCode == _SUM_END:
-                count = self.popIterator()
-                if count > 1:
-                    self.pushIterator(count - 1)
-                    ptr = self.popPointer()
-                    self.pushPointer(ptr)
-                    self._add()
-                    self.counter = ptr
-                else:
-                    self.popPointer()
 
             self.counter += 1
 
         return self.popStack()
 
-    def compute(self, samples:pyx.int=10_000, maxBins:pyx.int=32):
-        """
-        Run the simulation multiple times and collect results in a t-digest.
+    @pyx.linetrace(True)
+    def compute(self, samples:pyx.int=10000, maxBins:pyx.int=32):
+        """Run the simulation multiple times and collect results in a t-digest.
 
         Executes the VM program for the specified number of samples, resetting
         the VM state between each execution. Results are accumulated in a t-digest
@@ -717,8 +518,7 @@ class VirtualMachine():
         return rv
 
     def run(self):
-        """
-        Run the simulation with default parameters.
+        """Run the simulation with default parameters.
 
         Convenience method that calls compute() with default parameters.
 
