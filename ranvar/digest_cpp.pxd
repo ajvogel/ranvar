@@ -41,6 +41,10 @@ cdef extern from "digest.hpp" namespace "ranvar":
         void   setBins(const vector[double]& bins)
         void   setCnts(const vector[double]& cnts)
 
+        int  findLastLesserOrEqualIndex(double point) const
+        void shiftRightAndInsert(int idx, double point, double count)
+        void shiftLeftAndOverride(int idx)
+
 cdef extern from "digest.hpp" namespace "ranvar":
     double _rand()
     int    _randint(double l, double h)

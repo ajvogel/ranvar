@@ -37,16 +37,18 @@ public:
     void   setBins(const std::vector<double>& bins);
     void   setCnts(const std::vector<double>& cnts);
 
+    // Exposed for testing — mirrors the cpdef helpers in the Cython Python version
+    int    findLastLesserOrEqualIndex(double point) const;
+    void   shiftRightAndInsert(int idx, double point, double count);
+    void   shiftLeftAndOverride(int idx);
+
 private:
     int maxBins_;
     int nActive_;
     std::vector<double> bins_;
     std::vector<double> cnts_;
 
-    int    findLastLesserOrEqualIndex(double point) const;
-    void   shiftRightAndInsert(int idx, double point, double count);
     int    findMinimumDifference() const;
-    void   shiftLeftAndOverride(int idx);
     double sumWeights() const;
     void   _add(double point, double count);
 };

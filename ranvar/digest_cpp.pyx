@@ -274,6 +274,22 @@ cdef class Digest:
         """
         return self._digest.getActiveBinCount()
 
+    def _findLastLesserOrEqualIndex(self, double point):
+        """Find the index of the last centroid <= point (mirrors Python Digest API)."""
+        return self._digest.findLastLesserOrEqualIndex(point)
+
+    def _shiftRightAndInsert(self, int idx, double point, double count):
+        """Insert centroid at idx+1 shifting right (mirrors Python Digest API)."""
+        self._digest.shiftRightAndInsert(idx, point, count)
+
+    def _shiftLeftAndOverride(self, int idx):
+        """Remove centroid at idx by shifting left (mirrors Python Digest API)."""
+        self._digest.shiftLeftAndOverride(idx)
+
+    def _assertCompiled(self):
+        """Always passes — this is a compiled C++ extension."""
+        pass
+
     @property
     def maxBins(self):
         """Maximum number of centroids (read-only)."""
