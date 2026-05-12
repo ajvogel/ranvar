@@ -1,7 +1,7 @@
 # from .distributions import *
 # from . import nbinom
 from .vm import *
-from .digest import *
+from .cdigest import Digest, DigestArray
 from .nodes import *
 from .opcodes import *
 import numpy as np
@@ -244,7 +244,3 @@ def plot(digest, nBins=20, lower=None, upper=None, width=0.8, ax=None, *args, **
         ax = fig.gca()
 
     ax.bar(x, y, width=width*(bins[1] - bins[0]), *args, **kwds)
-        
-
-    
-    

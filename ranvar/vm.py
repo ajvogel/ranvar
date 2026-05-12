@@ -1,7 +1,7 @@
 import numpy as np
 import cython as pyx
 
-from .digest import Digest
+from .cdigest import Digest
 
 if pyx.compiled:
     from cython.cimports.libc.math import floor as c_floor
@@ -110,15 +110,6 @@ class VirtualMachine():
     iterCount: pyx.int
     iterators: np.ndarray
     def __init__(self, codes, operands) -> None:
-        """Initialize the virtual machine with program code and operands.
-
-        Args:
-            codes (np.ndarray): Array of operation codes defining the program
-            operands (np.ndarray): Array of operands for each operation
-
-        Note:
-            The codes and operands arrays must have the same length.
-        """
         self.codes    = codes
         self.operands = operands
         self.stack    = np.zeros(100)
@@ -148,20 +139,10 @@ class VirtualMachine():
     @pyx.wraparound(False)
     @pyx.cdivision(True)
     def _reset(self) -> pyx.void:
-        """Reset the virtual machine state for a new execution.
-
-        Clears all stacks, resets counters, and reinitializes memory arrays.
-        This allows the same VM instance to be used for multiple executions.
-        """
         self.stackCount   = 0
         self.iterCount    = 0
         self.pointerCount = 0
         self.counter      = 0
-
-        # self.stack    = np.zeros(100)
-        # self.variables = np.zeros(26)
-        # self.pointers = np.zeros(16, dtype=np.int_)
-        # self.iterators = np.zeros(16)
 
         i: pyx.int
         for i in range(100):
@@ -181,14 +162,6 @@ class VirtualMachine():
     @pyx.boundscheck(False)
     @pyx.wraparound(False)
     def pushPointer(self, value: pyx.int) -> pyx.void:
-        """Push a pointer (return address) onto the pointer stack.
-
-        Used for implementing loop constructs by storing the instruction
-        address to return to after loop completion.
-
-        Args:
-            value (int): The instruction pointer value to store
-        """
         self._pointers[self.pointerCount] = value
         self.pointerCount += 1
 
@@ -197,14 +170,6 @@ class VirtualMachine():
     @pyx.boundscheck(False)
     @pyx.wraparound(False)
     def popPointer(self) -> pyx.int:
-        """Pop a pointer (return address) from the pointer stack.
-
-        Returns:
-            int: The most recently pushed pointer value
-
-        Raises:
-            AssertionError: If the pointer stack is empty
-        """
         assert self.pointerCount > 0
         self.pointerCount -= 1
         return self._pointers[self.pointerCount]
@@ -214,14 +179,6 @@ class VirtualMachine():
     @pyx.boundscheck(False)
     @pyx.wraparound(False)
     def pushIterator(self, value: pyx.double) -> pyx.void:
-        """Push an iterator count onto the iterator stack.
-
-        Used for implementing loop constructs by tracking remaining
-        iterations for nested loops.
-
-        Args:
-            value (float): The iteration count to store
-        """
         self._iterators[self.iterCount] = value
         self.iterCount += 1
 
@@ -230,14 +187,6 @@ class VirtualMachine():
     @pyx.boundscheck(False)
     @pyx.wraparound(False)
     def popIterator(self) -> pyx.double:
-        """Pop an iterator count from the iterator stack.
-
-        Returns:
-            float: The most recently pushed iterator count
-
-        Raises:
-            AssertionError: If the iterator stack is empty
-        """
         assert self.iterCount > 0
         self.iterCount -= 1
         return self._iterators[self.iterCount]
@@ -247,11 +196,6 @@ class VirtualMachine():
     @pyx.boundscheck(False)
     @pyx.wraparound(False)
     def peekIterator(self) -> pyx.double:
-        """Return the top iterator count without removing it from the stack.
-
-        Returns:
-            float: The top iterator count value
-        """
         return self._iterators[self.iterCount - 1]
 
     @pyx.cfunc
@@ -259,11 +203,6 @@ class VirtualMachine():
     @pyx.boundscheck(False)
     @pyx.wraparound(False)
     def peekPointer(self) -> pyx.int:
-        """Return the top pointer without removing it from the stack.
-
-        Returns:
-            int: The top pointer value
-        """
         return self._pointers[self.pointerCount - 1]
 
     @pyx.cfunc
@@ -271,11 +210,6 @@ class VirtualMachine():
     @pyx.boundscheck(False)
     @pyx.wraparound(False)
     def pushStack(self, value: pyx.double):
-        """Push a value onto the execution stack.
-
-        Args:
-            value (float): The value to push onto the stack
-        """
         self._stack[self.stackCount] = value
         self.stackCount += 1
 
@@ -284,69 +218,29 @@ class VirtualMachine():
     @pyx.boundscheck(False)
     @pyx.wraparound(False)
     def popStack(self) -> pyx.float:
-        """Pop a value from the execution stack.
-
-        Returns:
-            float: The most recently pushed value
-
-        Raises:
-            AssertionError: If the execution stack is empty
-        """
         # assert self.stackCount > 0
         self.stackCount -= 1
         return self._stack[self.stackCount]
 
     @pyx.cfunc
     def _dropStack(self, cnt:pyx.int = 1):
-        """Drop (discard) multiple values from the execution stack.
-
-        Args:
-            cnt (int, optional): Number of values to drop. Defaults to 1.
-        """
         i: pyx.int
-        #print('Dropping ',cnt, ' values...')
         for i in range(cnt):
-            #print('    Drop', i, '...')
             self.popStack()
 
     @pyx.cfunc
     def _store(self, varNumber: pyx.double) -> pyx.void:
-        """Store the top stack value into a variable.
-
-        Pops a value from the execution stack and stores it in the specified
-        variable slot (0-25 corresponding to variables a-z).
-
-        Args:
-            varNumber (float): Variable index (0-25) to store the value in
-        """
         idx: pyx.int = pyx.cast(pyx.int, varNumber)
         varValue = self.popStack()
         self._variables[idx] = varValue
 
     @pyx.cfunc
     def _load(self, varNumber: pyx.double) -> pyx.void:
-        """Load a variable value onto the execution stack.
-
-        Pushes the value from the specified variable slot onto the stack.
-
-        Args:
-            varNumber (float): Variable index (0-25) to load the value from
-        """
         idx: pyx.int = pyx.cast(pyx.int, varNumber)
         self.pushStack(self._variables[idx])
 
     @pyx.cfunc
     def _sumStart(self, loopNumber: pyx.double) -> pyx.void:
-        """Initialize a summation loop.
-
-        Sets up the loop state by:
-        1. Popping the number of iterations from the stack
-        2. Pushing an initial sum of 0 onto the stack
-        3. Storing the iteration count and return address
-
-        Args:
-            loopNumber (float): Loop identifier (currently unused)
-        """
         idx: pyx.int = pyx.cast(pyx.int, loopNumber)
         nTerms = self.popStack()
         self.pushStack(0)
@@ -355,15 +249,6 @@ class VirtualMachine():
 
     @pyx.cfunc
     def _sumEnd(self, loopNumber: pyx.double) -> pyx.void:
-        """Process one iteration of a summation loop.
-
-        Adds the current value to the running sum, decrements the iteration
-        counter, and either continues the loop or exits if complete.
-
-        Args:
-            loopNumber (float): Loop identifier (currently unused)
-        """
-
         idx: pyx.int = pyx.cast(pyx.int, loopNumber)
 
         # First we add the running total to the answer.
@@ -383,29 +268,6 @@ class VirtualMachine():
 
     @pyx.cfunc
     def _binop(self, opCode: pyx.double) -> pyx.void:
-        """Execute a binary operation on the top two stack values.
-
-        Pops two values from the stack (x1, x2), performs the specified
-        operation, and pushes the result back onto the stack.
-
-        Supported operations:
-        - ADD: x1 + x2
-        - MUL: x1 * x2
-        - POW: x1 ** x2
-        - DIV: x1 / x2
-        - FLOORDIV: x1 // x2
-        - MOD: x1 % x2
-        - SUB: x1 - x2
-        - LT: 1 if x1 < x2 else 0
-        - LE: 1 if x1 <= x2 else 0
-
-        Args:
-            opCode (float): Operation code specifying which operation to perform
-        """
-        # When things are removed from the stack we pop them from the bottom of the stack
-        # in the reverse order in which they were pushed. So we pop x2 first before x1.
-
-
         x2 = self.popStack()
         x1 = self.popStack()
         if opCode == _ADD:
@@ -433,26 +295,13 @@ class VirtualMachine():
 
     @pyx.cfunc
     def _randInt(self) -> pyx.void:
-        """Generate a random integer within a specified range.
-
-        Pops two values from the stack (low, high) and pushes a random
-        integer in the range [low, high] inclusive.
-        """
         h = self.popStack()
         l = self.popStack()
 
-        # x: pyx.double = c_round((h - l)*_rand() + l)
         self.pushStack(randint(l, h))
-        #self.pushStack(pyx.cast(pyx.double, _randint(l,h)))
-        #self.pushStack(random.randint(int(l),int(h)))
 
     @pyx.cfunc
     def _randNorm(self) -> pyx.void:
-        """Generate a random number from a normal distribution.
-
-        Pops two values from the stack (mean, std_dev) and pushes a random
-        number drawn from the specified normal distribution.
-        """
         std: pyx.double = self.popStack()
         mu: pyx.double    = self.popStack()
 
@@ -460,12 +309,6 @@ class VirtualMachine():
 
     @pyx.cfunc
     def _randNegBinom(self) -> pyx.void:
-        """Generate a random number from a negative binomial distribution.
-
-        Pops two values from the stack (n, p) and pushes a random
-        number drawn from the negative binomial distribution.
-        n is the number of successes, p is the probability of success.
-        """
         p: pyx.double = self.popStack()
         n: pyx.double = self.popStack()
 
@@ -473,11 +316,6 @@ class VirtualMachine():
 
     @pyx.cfunc
     def _randGamma(self) -> pyx.void:
-        """Generate a random number from a shifted gamma distribution.
-
-        Pops three values from the stack (shape, scale, location) and pushes
-        a random number drawn from Gamma(shape, scale) shifted right by location.
-        """
         location: pyx.double = self.popStack()
         scale: pyx.double = self.popStack()
         shape: pyx.double = self.popStack()
@@ -486,11 +324,6 @@ class VirtualMachine():
 
     @pyx.cfunc
     def _randPert(self) -> pyx.void:
-        """Generate a random number from a PERT distribution.
-
-        Pops three values from the stack (low, mode, high) and pushes
-        a random number drawn from PERT(low, mode, high).
-        """
         high: pyx.double = self.popStack()
         mode: pyx.double = self.popStack()
         low:  pyx.double = self.popStack()
@@ -499,15 +332,6 @@ class VirtualMachine():
 
     @pyx.cfunc
     def _arraySum(self, nArray: pyx.double) -> pyx.void:
-        """Sum elements from an array within a specified range.
-
-        Pops start and end indices, then pops nArray values from the stack.
-        Sums only those values whose indices fall within [start, end) and
-        pushes the result.
-
-        Args:
-            nArray (float): Number of array elements to pop from the stack
-        """
         som: pyx.double = 0.0
         i: pyx.int
         nArrayInt: pyx.int = pyx.cast(pyx.int, nArray)
@@ -524,39 +348,12 @@ class VirtualMachine():
 
     @pyx.cfunc
     def _randQuantiles(self, nBins: pyx.double) -> pyx.void:
-        """Sample from a distribution defined by quantile values.
-
-        Expects nBins quantile values on the stack representing a cumulative
-        distribution. Generates a random sample by linear interpolation
-        between adjacent quantiles.
-
-        The method:
-        1. Generates a random uniform value
-        2. Finds the quantile interval containing this value
-        3. Interpolates linearly between the bounding quantiles
-        4. Pushes the interpolated result
-
-        Args:
-            nBins (float): Number of quantile bins on the stack
-
-        Example:
-            For quantiles [0.1, 0.15, 0.29, 0.43, 0.57, 0.71, 0.85, 0.99]
-            corresponding to values [x0, x1, x2, x3, x4, x5, x6, x7]
-        """
-        # There is one fewer intervals than there are actual points.
         dY: pyx.double = 1. / (nBins - 1)
         y_: pyx.double = rand()
-        #y_: pyx.double = 0.55
-
 
         i: pyx.double = c_floor(y_ / dY)
 
-        #print(i)
-        #print('Stack Count:', self.stackCount)
-
         self._dropStack(pyx.cast(pyx.int, i))
-
-        #print('Stack Count after initial drop:', self.stackCount)
 
         xi:pyx.double = self.popStack()
         xi_n:pyx.double = self.popStack()
@@ -564,11 +361,7 @@ class VirtualMachine():
         yi:pyx.double   = i*dY
         yi_n:pyx.double = yi + dY
 
-        #print(xi, ' -> ', xi_n)
-
         self._dropStack(pyx.cast(pyx.int, nBins - i - 2))
-
-        #print('Stack Count after dropping remaining:', self.stackCount)
 
         m:pyx.double = (xi_n - xi) / (yi_n - yi)
 
@@ -584,25 +377,6 @@ class VirtualMachine():
     @pyx.cdivision(True)
     @pyx.linetrace(True)
     def _randHist(self, nBins: pyx.double) -> pyx.void:
-        """Sample from a histogram representation.
-
-        Expects pairs of (value, cumulative_probability) on the stack
-        representing a histogram. Generates a random sample by finding
-        the appropriate bin and interpolating within it.
-
-        The method:
-        1. Generates a random uniform value p
-        2. Finds the histogram bin where cumulative probability brackets p
-        3. Linearly interpolates the value within that bin
-        4. Pushes the interpolated result
-
-        Args:
-            nBins (float): Number of histogram bins
-
-        Note:
-            Stack should contain alternating (xi, ci) pairs where xi is the
-            bin value and ci is the cumulative probability.
-        """
         p:    pyx.double
         xi:   pyx.double
         ci:   pyx.double
@@ -616,43 +390,27 @@ class VirtualMachine():
         nB = pyx.cast(pyx.int, nBins)
 
         p = rand()
-        #p = 0.25
-
-        # print("p = ", p)
 
         xi = self.popStack()
         ci = self.popStack()
 
-        # print("xi = ", xi)
-        # print('ci = ', ci)
-
         x_ = 0
 
         for i_n in range(1, nB):
-            # print("i_n")
             xi_n = self.popStack()
             ci_n = self.popStack()
-
-            # print("xi_n = ", xi)
-            # print('ci_n = ', ci)
-
-            # print(ci, "<=", p,"<", ci_n, "  ",ci <= p < ci_n)
 
             if ci <= p < ci_n:
                 m  = (xi_n - xi) / (ci_n - ci)
                 x_ = xi + m*(p - ci)
-                # print('x* = ', x_)
 
             elif (i_n == nBins-1) and (p == 1):
-                # If this is the last bin and p is exactly 1 we will miss the last value
-                # adding a second check for it here.
                 x_ = xi_n
 
             xi = xi_n
             ci = ci_n
 
 
-        #print('x* = ', x_)
         self.pushStack(x_)
 
 
@@ -660,11 +418,6 @@ class VirtualMachine():
 
 
     def printState(self):
-        """Print the current state of the virtual machine for debugging.
-
-        Displays the current instruction, operand, stack contents, and
-        pointer stack state. Useful for debugging VM execution.
-        """
         _stack = []
         for i in reversed(range(self.stackCount)):
             _stack.append(self.stack[i])
@@ -696,16 +449,11 @@ class VirtualMachine():
             execution. Call reset() before sample() for clean execution.
         """
 
-        # for e, (c, o) in enumerate(list(zip(self.codes, self.operands))):
-        #     print(f'{e}: {c}   {o}')
-
         N:pyx.int = self._codes.shape[0]
-        #i:pyx.int = 0
         opCode: pyx.double
         operand: pyx.double
 
         while self.counter < N:
-            #self.printState()
             opCode = self._codes[self.counter]
             operand = self._operands[self.counter]
 
@@ -765,7 +513,7 @@ class VirtualMachine():
         for i in range(samples):
             x:pyx.float = self.sample()
             self._reset()
-            rv._add(x, 1)
+            rv.add(x, 1)
 
         return rv
 

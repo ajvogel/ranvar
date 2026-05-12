@@ -14,7 +14,7 @@
 #     'name': 'casino',
 #     'version': '0.1.0',
 #     'description': 'Casino enables fast probabilistic modelling',
-#     'long_description': '# Casino Probabilistic Modelling Library\n\nThis is awesome.\n',
+#     'long_description': '# Casino Probabilistic Modelling Library\n\nThis is awesome.',
 #     'author': 'Adolph Vogel',
 #     'author_email': 'ajvogel@gmail.com',
 #     'maintainer': 'None',
@@ -39,6 +39,13 @@ extensions = [
     Extension("ranvar.random", ["ranvar/random.py"]),
     Extension("ranvar.vm", ["ranvar/vm.py"]),
     Extension("ranvar.digest", ["ranvar/digest.py"], include_dirs=[np.get_include()]),
+    Extension(
+        "ranvar.cdigest",
+        sources=["ranvar/cdigest.pyx"],
+        include_dirs=[np.get_include(), "ranvar/cpp"],
+        language="c++",
+        extra_compile_args=["-std=c++17"],
+    ),
 ]
 
 setup(
