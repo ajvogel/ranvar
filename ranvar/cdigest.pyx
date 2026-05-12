@@ -36,10 +36,35 @@ cdef class Digest:
     """
 
     def __cinit__(self, int maxBins=32):
-        self._digest = new CppDigest(maxBins)
+        # maxBins < 0 is a private sentinel used by from_ptr to skip allocation.
+        if maxBins >= 0:
+            self._digest = new CppDigest(maxBins)
+            self._owned = True
+        else:
+            self._digest = NULL
+            self._owned = False
+        self._parent = None
 
     def __dealloc__(self):
-        del self._digest
+        if self._owned and self._digest != NULL:
+            del self._digest
+
+    @staticmethod
+    cdef Digest from_ptr(CppDigest* ptr, object parent=None):
+        """Return a Digest that is a live view into an existing CppDigest.
+
+        The view does *not* own the pointer and will never free it.  ``parent``
+        should be the Python object (typically a DigestArray) that owns the
+        underlying memory; holding this reference prevents premature GC.
+
+        Warning: calling remove() or append() on the parent DigestArray may
+        invalidate this pointer if the internal vector reallocates.
+        """
+        cdef Digest d = Digest.__new__(Digest, -1)
+        d._digest = ptr
+        d._owned = False
+        d._parent = parent
+        return d
 
     def __reduce__(self):
         return (
@@ -202,12 +227,13 @@ cdef class DigestArray:
     A fixed-length array of Digest objects backed by C++ ranvar::DigestArray.
 
     Pre-populated with empty Digest instances on construction. Supports list-like
-    access via dunder methods. Note that __getitem__ returns a *copy* of the
-    underlying Digest — to mutate an element, retrieve it, modify it, then
-    write it back with __setitem__:
+    access via dunder methods. __getitem__ returns a *live view* into the
+    underlying element — mutations are reflected immediately in the array:
 
-        da[i].fit(data)   # modifies a copy — has no effect on da
-        d = da[i]; d.fit(data); da[i] = d   # correct
+        da[i].fit(data)   # works — modifies the array element in-place
+
+    Warning: the view's pointer is invalidated if the array is structurally
+    modified (remove / append) after the view is obtained.
 
     Args:
         length (int): Number of Digest instances to pre-allocate.
@@ -217,7 +243,7 @@ cdef class DigestArray:
         >>> da = DigestArray(5)
         >>> len(da)
         5
-        >>> d = da[0]; d.fit([1, 2, 3]); da[0] = d
+        >>> da[0].fit([1, 2, 3])   # mutates the element directly
         >>> da.sample()   # numpy array of 5 sampled values
     """
 
@@ -243,11 +269,7 @@ cdef class DigestArray:
             i += n
         if i < 0 or i >= n:
             raise IndexError(f"DigestArray index {idx} out of range")
-        d = Digest(self._array.getMaxBinsAt(i))
-        d._digest.setBins(self._array.getBinsAt(i))
-        d._digest.setCnts(self._array.getCntsAt(i))
-        d._digest.setActiveBinCount(self._array.getActiveBinCountAt(i))
-        return d
+        return Digest.from_ptr(self._array.at(i), self)
 
     def __setitem__(self, idx, value):
         cdef int n = self._array.size()

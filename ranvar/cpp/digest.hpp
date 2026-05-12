@@ -301,6 +301,8 @@ public:
     int size() const { return static_cast<int>(digests_.size()); }
     int getMaxBins() const { return maxBins_; }
 
+    Digest* at(int idx) { return &digests_[idx]; }
+
     // Per-element state accessors used by the Cython wrapper
     int    getMaxBinsAt(int idx)        const { return digests_[idx].getMaxBins(); }
     int    getActiveBinCountAt(int idx) const { return digests_[idx].getActiveBinCount(); }
