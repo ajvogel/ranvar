@@ -195,6 +195,7 @@ public:
     double pmf(int kk) const { return cdf(kk + 0.5) - cdf(kk - 0.5); }
 
     int sample() {
+        if (nActive_ == 0) return 0;
         double p = _rand();
         return static_cast<int>(std::round(quantile(p)));
     }
@@ -284,6 +285,44 @@ private:
             shiftLeftAndOverride(k + 1);
         }
     }
+};
+
+// ---------------------------------------------------------------------------
+// DigestArray
+// ---------------------------------------------------------------------------
+
+class DigestArray {
+public:
+    explicit DigestArray(int length, int maxBins = 32)
+        : maxBins_(maxBins)
+        , digests_(length, Digest(maxBins))
+    {}
+
+    int size() const { return static_cast<int>(digests_.size()); }
+    int getMaxBins() const { return maxBins_; }
+
+    // Per-element state accessors used by the Cython wrapper
+    int    getMaxBinsAt(int idx)        const { return digests_[idx].getMaxBins(); }
+    int    getActiveBinCountAt(int idx) const { return digests_[idx].getActiveBinCount(); }
+    const std::vector<double>& getBinsAt(int idx) const { return digests_[idx].getBins(); }
+    const std::vector<double>& getCntsAt(int idx) const { return digests_[idx].getCnts(); }
+
+    void set(int idx, const Digest& d) { digests_[idx] = d; }
+    void remove(int idx) { digests_.erase(digests_.begin() + idx); }
+    void append(const Digest& d) { digests_.push_back(d); }
+    void appendEmpty() { digests_.emplace_back(maxBins_); }
+
+    std::vector<double> sample() {
+        std::vector<double> result;
+        result.reserve(digests_.size());
+        for (auto& d : digests_)
+            result.push_back(static_cast<double>(d.sample()));
+        return result;
+    }
+
+private:
+    int maxBins_;
+    std::vector<Digest> digests_;
 };
 
 } // namespace ranvar

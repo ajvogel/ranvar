@@ -1,9 +1,9 @@
-# Cython declaration file for the C++ Digest wrapper.
+# Cython declaration file for the C++ Digest / DigestArray wrappers.
 #
 # Other Cython modules can cimport this to access the C++ class declarations
-# and the Python extension type at C speed:
+# and the Python extension types at C speed:
 #
-#   from ranvar.cdigest cimport CppDigest, Digest
+#   from ranvar.cdigest cimport CppDigest, Digest, CppDigestArray, DigestArray
 
 from libcpp.vector cimport vector
 
@@ -51,10 +51,37 @@ cdef extern from "digest.hpp" namespace "ranvar":
     double _randnorm(double mu, double stdev)
 
 # ---------------------------------------------------------------------------
-# Python extension type declaration (for cimport by other Cython modules)
+# Extern declarations for the C++ ranvar::DigestArray class
+# ---------------------------------------------------------------------------
+
+cdef extern from "digest.hpp" namespace "ranvar":
+
+    cdef cppclass CppDigestArray "ranvar::DigestArray":
+        CppDigestArray(int length, int maxBins) except +
+
+        int size()       const
+        int getMaxBins() const
+
+        int    getMaxBinsAt(int idx)        const
+        int    getActiveBinCountAt(int idx) const
+        const vector[double]& getBinsAt(int idx) const
+        const vector[double]& getCntsAt(int idx) const
+
+        void set(int idx, const CppDigest& d)
+        void remove(int idx)
+        void append(const CppDigest& d)
+        void appendEmpty()
+
+        vector[double] sample()
+
+# ---------------------------------------------------------------------------
+# Python extension type declarations (for cimport by other Cython modules)
 # ---------------------------------------------------------------------------
 
 cdef class Digest:
     cdef CppDigest* _digest
     cdef void _set_bins_list(self, list bins_list)
     cdef void _set_cnts_list(self, list cnts_list)
+
+cdef class DigestArray:
+    cdef CppDigestArray* _array
