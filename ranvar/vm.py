@@ -1,7 +1,7 @@
 import numpy as np
 import cython as pyx
 
-from .digest_cpp import Digest
+from .cdigest import Digest
 
 if pyx.compiled:
     from cython.cimports.libc.math import floor as c_floor

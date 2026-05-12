@@ -1,6 +1,6 @@
 from typing import SupportsAbs
 import numpy as np
-from .digest_cpp import Digest
+from .cdigest import Digest
 from .vm import VirtualMachine
 from .opcodes import *
 
