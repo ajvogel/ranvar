@@ -67,7 +67,12 @@ cdef extern from "digest.hpp" namespace "ranvar":
         const vector[double]& getBinsAt(int idx) const
         const vector[double]& getCntsAt(int idx) const
 
-        CppDigest* at(int idx)
+        void   addAt(int idx, double point, double count)
+        void   fitAt(int idx, const vector[double]& x) except +
+        int    sampleAt(int idx)
+        double meanAt(int idx)               const
+        double quantileAt(int idx, double p) const
+        double cdfAt(int idx, double k)      const
 
         void set(int idx, const CppDigest& d)
         void remove(int idx)
@@ -82,12 +87,8 @@ cdef extern from "digest.hpp" namespace "ranvar":
 
 cdef class Digest:
     cdef CppDigest* _digest
-    cdef bint _owned   # True when this instance owns the pointer and must delete it
-    cdef object _parent  # holds a ref to the owning DigestArray for non-owned views
     cdef void _set_bins_list(self, list bins_list)
     cdef void _set_cnts_list(self, list cnts_list)
-    @staticmethod
-    cdef Digest from_ptr(CppDigest* ptr, object parent=*)
 
 cdef class DigestArray:
     cdef CppDigestArray* _array

@@ -36,35 +36,10 @@ cdef class Digest:
     """
 
     def __cinit__(self, int maxBins=32):
-        # maxBins < 0 is a private sentinel used by from_ptr to skip allocation.
-        if maxBins >= 0:
-            self._digest = new CppDigest(maxBins)
-            self._owned = True
-        else:
-            self._digest = NULL
-            self._owned = False
-        self._parent = None
+        self._digest = new CppDigest(maxBins)
 
     def __dealloc__(self):
-        if self._owned and self._digest != NULL:
-            del self._digest
-
-    @staticmethod
-    cdef Digest from_ptr(CppDigest* ptr, object parent=None):
-        """Return a Digest that is a live view into an existing CppDigest.
-
-        The view does *not* own the pointer and will never free it.  ``parent``
-        should be the Python object (typically a DigestArray) that owns the
-        underlying memory; holding this reference prevents premature GC.
-
-        Warning: calling remove() or append() on the parent DigestArray may
-        invalidate this pointer if the internal vector reallocates.
-        """
-        cdef Digest d = Digest.__new__(Digest, -1)
-        d._digest = ptr
-        d._owned = False
-        d._parent = parent
-        return d
+        del self._digest
 
     def __reduce__(self):
         return (
@@ -227,13 +202,13 @@ cdef class DigestArray:
     A fixed-length array of Digest objects backed by C++ ranvar::DigestArray.
 
     Pre-populated with empty Digest instances on construction. Supports list-like
-    access via dunder methods. __getitem__ returns a *live view* into the
-    underlying element — mutations are reflected immediately in the array:
+    access via dunder methods. __getitem__ returns a *copy* of the underlying
+    Digest — use the pass-through methods (addAt, fitAt, sampleAt, …) to mutate
+    or query individual elements without copying:
 
-        da[i].fit(data)   # works — modifies the array element in-place
-
-    Warning: the view's pointer is invalidated if the array is structurally
-    modified (remove / append) after the view is obtained.
+        da.fitAt(0, data)          # fit data directly into slot 0
+        da.addAt(0, point)         # add a point to slot 0
+        da.sampleAt(0)             # sample from slot 0
 
     Args:
         length (int): Number of Digest instances to pre-allocate.
@@ -241,9 +216,7 @@ cdef class DigestArray:
 
     Example:
         >>> da = DigestArray(5)
-        >>> len(da)
-        5
-        >>> da[0].fit([1, 2, 3])   # mutates the element directly
+        >>> da.fitAt(0, [1, 2, 3])
         >>> da.sample()   # numpy array of 5 sampled values
     """
 
@@ -269,7 +242,11 @@ cdef class DigestArray:
             i += n
         if i < 0 or i >= n:
             raise IndexError(f"DigestArray index {idx} out of range")
-        return Digest.from_ptr(self._array.at(i), self)
+        d = Digest(self._array.getMaxBinsAt(i))
+        d._digest.setBins(self._array.getBinsAt(i))
+        d._digest.setCnts(self._array.getCntsAt(i))
+        d._digest.setActiveBinCount(self._array.getActiveBinCountAt(i))
+        return d
 
     def __setitem__(self, idx, value):
         cdef int n = self._array.size()
@@ -327,6 +304,76 @@ cdef class DigestArray:
             if not isinstance(digest, Digest):
                 raise TypeError("DigestArray elements must be Digest instances")
             self._array.append((<Digest>digest)._digest[0])
+
+    # --- Pass-through methods on individual elements ----------------------
+
+    def addAt(self, int idx, double point, double count=1.0):
+        """Add a weighted point to the Digest at position idx.
+
+        Args:
+            idx (int): Index of the target Digest.
+            point (float): Value to add.
+            count (float, optional): Weight. Defaults to 1.
+        """
+        self._array.addAt(idx, point, count)
+
+    def fitAt(self, int idx, x):
+        """Fit a collection of data points into the Digest at position idx.
+
+        Args:
+            idx (int): Index of the target Digest.
+            x (iterable): Numeric values to add.
+        """
+        cdef vector[double] v
+        for xx in x:
+            v.push_back(<double>xx)
+        self._array.fitAt(idx, v)
+
+    def sampleAt(self, int idx):
+        """Sample one value from the Digest at position idx.
+
+        Args:
+            idx (int): Index of the target Digest.
+
+        Returns:
+            int: A sampled value (0 if the Digest is empty).
+        """
+        return self._array.sampleAt(idx)
+
+    def meanAt(self, int idx):
+        """Return the weighted mean of the Digest at position idx.
+
+        Args:
+            idx (int): Index of the target Digest.
+
+        Returns:
+            float: Weighted mean.
+        """
+        return self._array.meanAt(idx)
+
+    def quantileAt(self, int idx, double p):
+        """Return the quantile at probability p for the Digest at position idx.
+
+        Args:
+            idx (int): Index of the target Digest.
+            p (float): Probability in [0, 1].
+
+        Returns:
+            float: Estimated quantile value.
+        """
+        return self._array.quantileAt(idx, p)
+
+    def cdfAt(self, int idx, double k):
+        """Return the CDF value at k for the Digest at position idx.
+
+        Args:
+            idx (int): Index of the target Digest.
+            k (float): Point at which to evaluate the CDF.
+
+        Returns:
+            float: Estimated CDF value in [0, 1].
+        """
+        return self._array.cdfAt(idx, k)
 
     # --- Sampling ----------------------------------------------------------
 

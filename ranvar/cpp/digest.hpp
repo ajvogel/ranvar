@@ -301,7 +301,13 @@ public:
     int size() const { return static_cast<int>(digests_.size()); }
     int getMaxBins() const { return maxBins_; }
 
-    Digest* at(int idx) { return &digests_[idx]; }
+    // Pass-through methods — operate on a specific element without exposing a pointer
+    void   addAt(int idx, double point, double count = 1.0) { digests_[idx].add(point, count); }
+    void   fitAt(int idx, const std::vector<double>& x)    { digests_[idx].fit(x); }
+    int    sampleAt(int idx)                                { return digests_[idx].sample(); }
+    double meanAt(int idx)                  const { return digests_[idx].mean(); }
+    double quantileAt(int idx, double p)    const { return digests_[idx].quantile(p); }
+    double cdfAt(int idx, double k)         const { return digests_[idx].cdf(k); }
 
     // Per-element state accessors used by the Cython wrapper
     int    getMaxBinsAt(int idx)        const { return digests_[idx].getMaxBins(); }
