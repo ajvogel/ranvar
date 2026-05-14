@@ -68,6 +68,32 @@ cdef class Digest:
             v.push_back(<double>c)
         self._digest.setCnts(v)
 
+    # --- Arithmetic operators -----------------------------------------------
+
+    def __add__(self, Digest other):
+        """Compute the distribution of the sum of two independent random variables.
+
+        Uses the Discrete Centroid Convolution algorithm: for every pair of
+        centroids (ci from self, cj from other) the result digest receives a
+        centroid at ci + cj with probability p_i * p_j, where p_i and p_j are
+        the normalised weights of the respective centroids.
+
+        Args:
+            other (Digest): The second operand distribution.
+
+        Returns:
+            Digest: A new Digest representing the distribution of X + Y.
+        """
+        cdef CppDigest* result_ptr = new CppDigest(
+            self._digest[0] + other._digest[0]
+        )
+        d = Digest(result_ptr.getMaxBins())
+        d._digest.setBins(result_ptr.getBins())
+        d._digest.setCnts(result_ptr.getCnts())
+        d._digest.setActiveBinCount(result_ptr.getActiveBinCount())
+        del result_ptr
+        return d
+
     # --- Core mutating API -------------------------------------------------
 
     def fit(self, x):
@@ -288,6 +314,29 @@ cdef class DigestArray:
 
     def __repr__(self):
         return f"DigestArray(length={self._array.size()}, maxBins={self._array.getMaxBins()})"
+
+    # --- Arithmetic operators -----------------------------------------------
+
+    def __add__(self, DigestArray other):
+        """Element-wise addition of two DigestArrays using Discrete Centroid Convolution.
+
+        Each position i of the result holds the distribution of X_i + Y_i where
+        X_i ~ self[i] and Y_i ~ other[i]. The result length equals the shorter
+        of the two arrays.
+
+        Args:
+            other (DigestArray): The second operand.
+
+        Returns:
+            DigestArray: A new DigestArray of length min(len(self), len(other)).
+        """
+        cdef CppDigestArray* result_ptr = new CppDigestArray(
+            self._array[0] + other._array[0]
+        )
+        cdef DigestArray da = DigestArray.__new__(DigestArray, 1, 32)
+        del da._array
+        da._array = result_ptr
+        return da
 
     # --- Mutating helpers --------------------------------------------------
 

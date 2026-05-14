@@ -15,6 +15,7 @@ cdef extern from "digest.hpp" namespace "ranvar":
 
     cdef cppclass CppDigest "ranvar::Digest":
         CppDigest(int maxBins) except +
+        CppDigest(const CppDigest&) except +
 
         void fit(const vector[double]& x) except +
         void add(double point, double count) except +
@@ -45,6 +46,8 @@ cdef extern from "digest.hpp" namespace "ranvar":
         void shiftRightAndInsert(int idx, double point, double count)
         void shiftLeftAndOverride(int idx)
 
+        CppDigest operator+(const CppDigest& other) const
+
 cdef extern from "digest.hpp" namespace "ranvar":
     double _rand()
     int    _randint(double l, double h)
@@ -58,6 +61,7 @@ cdef extern from "digest.hpp" namespace "ranvar":
 
     cdef cppclass CppDigestArray "ranvar::DigestArray":
         CppDigestArray(int length, int maxBins) except +
+        CppDigestArray(const CppDigestArray&) except +
 
         int size()       const
         int getMaxBins() const
@@ -80,6 +84,8 @@ cdef extern from "digest.hpp" namespace "ranvar":
         void appendEmpty()
 
         vector[double] sample()
+
+        CppDigestArray operator+(const CppDigestArray& other) const
 
 # ---------------------------------------------------------------------------
 # Python extension type declarations (for cimport by other Cython modules)
