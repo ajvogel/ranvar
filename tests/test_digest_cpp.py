@@ -11,7 +11,7 @@ import pickle
 import numpy as np
 import pytest
 
-from ranvar.digest_cpp import Digest
+from ranvar.cdigest import Digest
 
 
 def _make_digest(maxBins=32, N=10_000, seed=31337):
@@ -168,3 +168,91 @@ def test_sample():
     val = d.sample()
     assert isinstance(val, int)
     assert d.lower() - 1 <= val <= d.upper() + 1
+
+
+# ---------------------------------------------------------------------------
+# operator+ — Discrete Centroid Convolution
+# ---------------------------------------------------------------------------
+
+def test_add_returns_digest():
+    d1 = _make_digest()
+    d2 = _make_digest(seed=42)
+    result = d1 + d2
+    assert isinstance(result, Digest)
+
+
+def test_add_mean_is_sum_of_means():
+    """E[X + Y] == E[X] + E[Y] for independent X, Y."""
+    d1 = _make_digest(seed=1)
+    d2 = _make_digest(seed=2)
+    result = d1 + d2
+    assert abs(result.mean() - (d1.mean() + d2.mean())) < 1.0
+
+
+def test_add_bounds():
+    """lower(X+Y) == lower(X)+lower(Y) and upper(X+Y) == upper(X)+upper(Y)."""
+    d1 = _make_digest(seed=10)
+    d2 = _make_digest(seed=20)
+    result = d1 + d2
+    assert result.lower() == d1.lower() + d2.lower()
+    assert result.upper() == d1.upper() + d2.upper()
+
+
+def test_add_weights_sum_to_one():
+    """Convolution weights are normalised probabilities summing to 1."""
+    d1 = _make_digest(seed=3)
+    d2 = _make_digest(seed=4)
+    result = d1 + d2
+    assert abs(sum(result.getWeights()) - 1.0) < 1e-10
+
+
+def test_add_constant_shifts_distribution():
+    """Adding a degenerate (single-point) digest shifts every quantile by that constant."""
+    np.random.seed(0)
+    data = np.random.randn(5_000) * 50 + 200
+    d = Digest(maxBins=64)
+    d.fit(data)
+
+    constant = Digest(maxBins=64)
+    constant.add(100.0)
+
+    shifted = d + constant
+
+    for p in [0.1, 0.25, 0.5, 0.75, 0.9]:
+        assert abs(shifted.quantile(p) - (d.quantile(p) + 100.0)) < 5.0
+
+
+def test_add_symmetry():
+    """X + Y and Y + X should have identical means and near-identical quantiles.
+
+    Means are exactly equal because both orderings sum the same centroid pairs.
+    Quantiles may differ by a small amount because t-digest centroid merging is
+    insertion-order-sensitive, so the tolerance is set to a few distribution units.
+    """
+    d1 = _make_digest(seed=7)
+    d2 = _make_digest(seed=8)
+    ab = d1 + d2
+    ba = d2 + d1
+    assert abs(ab.mean() - ba.mean()) < 1e-10
+    for p in [0.1, 0.5, 0.9]:
+        assert abs(ab.quantile(p) - ba.quantile(p)) < 10.0
+
+
+def test_add_two_normals_variance():
+    """Sum of two Normal(mu, sigma) distributions has variance 2*sigma^2."""
+    np.random.seed(99)
+    mu, sigma = 0.0, 50.0
+    data1 = np.random.randn(20_000) * sigma + mu
+    data2 = np.random.randn(20_000) * sigma + mu
+
+    d1 = Digest(maxBins=128)
+    d1.fit(data1)
+    d2 = Digest(maxBins=128)
+    d2.fit(data2)
+
+    result = d1 + d2
+
+    # For N(0, sigma) + N(0, sigma) = N(0, sqrt(2)*sigma), the IQR ≈ 1.349 * sqrt(2)*sigma
+    expected_iqr = 1.349 * (2 ** 0.5) * sigma
+    actual_iqr = result.quantile(0.75) - result.quantile(0.25)
+    assert abs(actual_iqr - expected_iqr) / expected_iqr < 0.05

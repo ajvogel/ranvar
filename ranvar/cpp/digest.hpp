@@ -200,6 +200,27 @@ public:
         return static_cast<int>(std::round(quantile(p)));
     }
 
+    // --- Arithmetic operators ------------------------------------------------
+
+    // Discrete Centroid Convolution: computes the distribution of X + Y where
+    // X ~ *this and Y ~ other, by taking the outer sum of all centroid pairs
+    // weighted by their joint probabilities.
+    Digest operator+(const Digest& other) const {
+        double W1 = sumWeights();
+        double W2 = other.sumWeights();
+        int resultMaxBins = maxBins_ > other.maxBins_ ? maxBins_ : other.maxBins_;
+        Digest result(resultMaxBins);
+        if (W1 == 0.0 || W2 == 0.0) return result;
+        for (int i = 0; i < nActive_; ++i) {
+            double p1 = cnts_[i] / W1;
+            for (int j = 0; j < other.nActive_; ++j) {
+                double p2 = other.cnts_[j] / W2;
+                result._add(bins_[i] + other.bins_[j], p1 * p2);
+            }
+        }
+        return result;
+    }
+
     // --- Serialisation helpers -----------------------------------------------
 
     int    getMaxBins()        const { return maxBins_; }

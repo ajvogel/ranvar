@@ -68,6 +68,32 @@ cdef class Digest:
             v.push_back(<double>c)
         self._digest.setCnts(v)
 
+    # --- Arithmetic operators -----------------------------------------------
+
+    def __add__(self, Digest other):
+        """Compute the distribution of the sum of two independent random variables.
+
+        Uses the Discrete Centroid Convolution algorithm: for every pair of
+        centroids (ci from self, cj from other) the result digest receives a
+        centroid at ci + cj with probability p_i * p_j, where p_i and p_j are
+        the normalised weights of the respective centroids.
+
+        Args:
+            other (Digest): The second operand distribution.
+
+        Returns:
+            Digest: A new Digest representing the distribution of X + Y.
+        """
+        cdef CppDigest* result_ptr = new CppDigest(
+            self._digest[0] + other._digest[0]
+        )
+        d = Digest(result_ptr.getMaxBins())
+        d._digest.setBins(result_ptr.getBins())
+        d._digest.setCnts(result_ptr.getCnts())
+        d._digest.setActiveBinCount(result_ptr.getActiveBinCount())
+        del result_ptr
+        return d
+
     # --- Core mutating API -------------------------------------------------
 
     def fit(self, x):

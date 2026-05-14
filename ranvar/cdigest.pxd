@@ -15,6 +15,7 @@ cdef extern from "digest.hpp" namespace "ranvar":
 
     cdef cppclass CppDigest "ranvar::Digest":
         CppDigest(int maxBins) except +
+        CppDigest(const CppDigest&) except +
 
         void fit(const vector[double]& x) except +
         void add(double point, double count) except +
@@ -44,6 +45,8 @@ cdef extern from "digest.hpp" namespace "ranvar":
         int  findLastLesserOrEqualIndex(double point) const
         void shiftRightAndInsert(int idx, double point, double count)
         void shiftLeftAndOverride(int idx)
+
+        CppDigest operator+(const CppDigest& other) const
 
 cdef extern from "digest.hpp" namespace "ranvar":
     double _rand()
