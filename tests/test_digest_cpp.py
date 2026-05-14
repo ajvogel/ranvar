@@ -11,7 +11,7 @@ import pickle
 import numpy as np
 import pytest
 
-from ranvar.cdigest import Digest
+from ranvar.cdigest import Digest, DigestArray
 
 
 def _make_digest(maxBins=32, N=10_000, seed=31337):
@@ -256,3 +256,70 @@ def test_add_two_normals_variance():
     expected_iqr = 1.349 * (2 ** 0.5) * sigma
     actual_iqr = result.quantile(0.75) - result.quantile(0.25)
     assert abs(actual_iqr - expected_iqr) / expected_iqr < 0.05
+
+
+# ---------------------------------------------------------------------------
+# DigestArray operator+ — element-wise addition
+# ---------------------------------------------------------------------------
+
+def _make_array(length, seed=0, mu=100.0, sigma=50.0, N=5_000, maxBins=32):
+    np.random.seed(seed)
+    da = DigestArray(length, maxBins)
+    for i in range(length):
+        data = np.random.randn(N) * sigma + mu * (i + 1)
+        da.fitAt(i, data)
+    return da
+
+
+def test_array_add_returns_digestarray():
+    da1 = _make_array(4)
+    da2 = _make_array(4, seed=1)
+    result = da1 + da2
+    assert isinstance(result, DigestArray)
+
+
+def test_array_add_equal_length():
+    da1 = _make_array(5)
+    da2 = _make_array(5, seed=2)
+    result = da1 + da2
+    assert len(result) == 5
+
+
+def test_array_add_truncates_to_shorter():
+    da_long  = _make_array(6)
+    da_short = _make_array(3, seed=3)
+    assert len(da_long  + da_short) == 3
+    assert len(da_short + da_long)  == 3
+
+
+def test_array_add_element_means():
+    """Each element's mean in the result equals the sum of the input element means."""
+    da1 = _make_array(4, seed=10)
+    da2 = _make_array(4, seed=20)
+    result = da1 + da2
+    for i in range(len(result)):
+        expected = da1[i].mean() + da2[i].mean()
+        assert abs(result[i].mean() - expected) < 1.0
+
+
+def test_array_add_element_bounds():
+    """Min/max centroids of each result element equal the sums of the input min/max centroids.
+
+    The t-digest never merges its first or last centroid, so the extreme values
+    are preserved exactly as floating-point sums.
+    """
+    da1 = _make_array(3, seed=5, N=10_000)
+    da2 = _make_array(3, seed=6, N=10_000)
+    result = da1 + da2
+    for i in range(len(result)):
+        assert result[i].centroids()[0]  == da1[i].centroids()[0]  + da2[i].centroids()[0]
+        assert result[i].centroids()[-1] == da1[i].centroids()[-1] + da2[i].centroids()[-1]
+
+
+def test_array_add_weights_sum_to_one():
+    """Convolution preserves normalised weights at every position."""
+    da1 = _make_array(4, seed=7)
+    da2 = _make_array(4, seed=8)
+    result = da1 + da2
+    for i in range(len(result)):
+        assert abs(sum(result[i].getWeights()) - 1.0) < 1e-10

@@ -315,6 +315,29 @@ cdef class DigestArray:
     def __repr__(self):
         return f"DigestArray(length={self._array.size()}, maxBins={self._array.getMaxBins()})"
 
+    # --- Arithmetic operators -----------------------------------------------
+
+    def __add__(self, DigestArray other):
+        """Element-wise addition of two DigestArrays using Discrete Centroid Convolution.
+
+        Each position i of the result holds the distribution of X_i + Y_i where
+        X_i ~ self[i] and Y_i ~ other[i]. The result length equals the shorter
+        of the two arrays.
+
+        Args:
+            other (DigestArray): The second operand.
+
+        Returns:
+            DigestArray: A new DigestArray of length min(len(self), len(other)).
+        """
+        cdef CppDigestArray* result_ptr = new CppDigestArray(
+            self._array[0] + other._array[0]
+        )
+        cdef DigestArray da = DigestArray.__new__(DigestArray, 1, 32)
+        del da._array
+        da._array = result_ptr
+        return da
+
     # --- Mutating helpers --------------------------------------------------
 
     def append(self, digest=None):

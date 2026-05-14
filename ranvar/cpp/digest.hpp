@@ -341,6 +341,18 @@ public:
     void append(const Digest& d) { digests_.push_back(d); }
     void appendEmpty() { digests_.emplace_back(maxBins_); }
 
+    // Element-wise addition; truncates to the length of the shorter array.
+    DigestArray operator+(const DigestArray& other) const {
+        int len = static_cast<int>(digests_.size());
+        int otherLen = static_cast<int>(other.digests_.size());
+        if (otherLen < len) len = otherLen;
+        int resultMaxBins = maxBins_ > other.maxBins_ ? maxBins_ : other.maxBins_;
+        DigestArray result(len, resultMaxBins);
+        for (int i = 0; i < len; ++i)
+            result.digests_[i] = digests_[i] + other.digests_[i];
+        return result;
+    }
+
     std::vector<double> sample() {
         std::vector<double> result;
         result.reserve(digests_.size());
